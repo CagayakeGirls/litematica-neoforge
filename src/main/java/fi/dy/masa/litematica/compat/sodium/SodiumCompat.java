@@ -1,8 +1,8 @@
 package fi.dy.masa.litematica.compat.sodium;
 
 import fi.dy.masa.litematica.mixin.render.IMixinGameRenderer;
-import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.MinecraftClient;
+import team.cagayakegirls.mafglib.utils.ModPlatform;
 
 public class SodiumCompat
 {
@@ -11,7 +11,7 @@ public class SodiumCompat
 
     public static void checkForSodium()
     {
-        hasSodium = FabricLoader.getInstance().isModLoaded("sodium");
+        hasSodium = ModPlatform.isModLoaded("sodium");
     }
 
     public static boolean hasSodium() { return hasSodium; }
