@@ -22,7 +22,7 @@ Forgematica is a client-side Minecraft mod using NeoForge. It is more or less a 
 [Original Repo Readme](Original-README.md)
 
 ## How to use in Minecraft
-See [malilib wiki](https://github.com/maruohon/malilib/wiki)
+See [litematica wiki](https://github.com/maruohon/litematica/wiki)
 
 ## Development
 
