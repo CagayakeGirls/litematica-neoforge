@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.function.Predicate;
 import javax.annotation.Nonnull;
 import com.google.common.collect.ImmutableList;
+import net.neoforged.neoforge.entity.PartEntity;
 import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.block.Block;
@@ -245,7 +246,7 @@ public class WorldSchematic extends World
     }
 
     @Override
-    public Collection<EnderDragonPart> getEnderDragonParts()
+    public Collection<PartEntity<?>> getEnderDragonParts()
     {
         return List.of();
     }
@@ -613,6 +614,26 @@ public class WorldSchematic extends World
     public FuelRegistry getFuelRegistry()
     {
         return null;
+    }
+
+    @Override
+    public void setDayTimeFraction(float f) {
+
+    }
+
+    @Override
+    public float getDayTimeFraction() {
+        return 0;
+    }
+
+    @Override
+    public float getDayTimePerTick() {
+        return 0;
+    }
+
+    @Override
+    public void setDayTimePerTick(float f) {
+
     }
 
     @Override
