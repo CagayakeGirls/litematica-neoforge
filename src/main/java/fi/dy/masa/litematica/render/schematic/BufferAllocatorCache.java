@@ -6,10 +6,10 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.util.BufferAllocator;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
 
-@Environment(EnvType.CLIENT)
+@OnlyIn(Dist.CLIENT)
 public class BufferAllocatorCache implements AutoCloseable
 {
     protected static final List<RenderLayer> LAYERS = ChunkRenderLayers.LAYERS;
