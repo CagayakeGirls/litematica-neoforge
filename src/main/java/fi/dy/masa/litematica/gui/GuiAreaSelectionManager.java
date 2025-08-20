@@ -66,7 +66,7 @@ public class GuiAreaSelectionManager extends GuiListBase<DirectoryEntry, WidgetD
     protected void reCreateGuiElements()
     {
         this.clearButtons();
-        this.clearWidgets();
+        this.clearChildren();
 
         int x = this.width - 13;
         int y = 24;
