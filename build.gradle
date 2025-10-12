@@ -47,6 +47,7 @@ loom {
 
 var generateModMetadata = tasks.register("generateModMetadata", ProcessResources) {
     var replaceProperties = [
+            mafglib_version_range  : mafglib_version_range,
             minecraft_version_range: minecraft_version_range,
             neoforge_version_range : neoforge_version_range,
             fml_version_range      : fml_version_range,
