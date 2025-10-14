@@ -7,10 +7,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.client.render.BlockRenderLayer;
 import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.util.BufferAllocator;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+//import net.fabricmc.api.EnvType;
+//import net.fabricmc.api.Environment;
 
-@Environment(EnvType.CLIENT)
+//@Environment(EnvType.CLIENT)
 public class BufferAllocatorCache implements AutoCloseable
 {
     protected static final List<BlockRenderLayer> BLOCK_LAYERS = ChunkRenderLayers.BLOCK_RENDER_LAYERS;

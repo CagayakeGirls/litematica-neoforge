@@ -1,0 +1,51 @@
+modLoader="javafml"
+loaderVersion="${fml_version_range}"
+license="LGPLv3"
+issueTrackerURL="${mod_link}/issues"
+
+[[mods]]
+modId="${mod_id}"
+version="${mod_version}"
+displayName="${mod_name}"
+displayURL="${mod_link}"
+logoFile="icon.png"
+credits="masa"
+authors="TexTrue, CagayakeGirls"
+description='''
+Litematica unofficial NeoForge port. A modern schematic mod for NeoForge.
+'''
+
+[[mods]]
+modId="litematica"
+version="${mod_version}"
+displayName="Litematica Stub"
+logoFile="assets/litematica/icon.png"
+credits="masa"
+authors="TexTrue, CagayakeGirls"
+description='''
+Litematica Stub.
+'''
+
+[[mixins]]
+config="mixins.litematica.json"
+
+[[dependencies."${mod_id}"]]
+modId="neoforge"
+type="required"
+versionRange="${neoforge_version_range}"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies."${mod_id}"]]
+modId="minecraft"
+type="required"
+versionRange="${minecraft_version_range}"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies."${mod_id}"]]
+modId="mafglib"
+type="required"
+versionRange="${mafglib_version_range}"
+ordering="NONE"
+side="BOTH"
