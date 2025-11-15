@@ -7,8 +7,8 @@ range-mafglib = "[0.4.6,)"
 version-env = "client"
 version-type = "release"
 
-platformId-curseforge = "910766"
-platformId-modrinth = "SKI34J7B"
+platformId-curseforge = "912441"
+platformId-modrinth = "dCKRaeBC"
 
 yarn-patch = "1.21+build.4"
 
