@@ -2,12 +2,12 @@ package fi.dy.masa.litematica.render.schematic;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.util.*;
-import it.unimi.dsi.fastutil.objects.ObjectArraySet;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.client.render.BlockRenderLayer;
 import net.minecraft.client.render.BuiltBuffer;
 import net.minecraft.client.render.RenderLayer;
+import java.util.*;
+import it.unimi.dsi.fastutil.objects.ObjectArraySet;
 
 public class ChunkRenderDataSchematic implements AutoCloseable
 {

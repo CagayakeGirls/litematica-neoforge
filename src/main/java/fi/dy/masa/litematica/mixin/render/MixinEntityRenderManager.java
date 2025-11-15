@@ -1,7 +1,6 @@
 package fi.dy.masa.litematica.mixin.render;
 
 import java.util.Map;
-
 import net.minecraft.client.network.AbstractClientPlayerEntity;
 import net.minecraft.client.network.ClientMannequinEntity;
 import net.minecraft.client.network.ClientPlayerEntity;

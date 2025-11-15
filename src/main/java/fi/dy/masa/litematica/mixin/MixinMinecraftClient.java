@@ -1,7 +1,5 @@
 package fi.dy.masa.litematica.mixin;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.util.thread.ReentrantThreadExecutor;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -11,6 +9,8 @@ import fi.dy.masa.litematica.config.Configs;
 import fi.dy.masa.litematica.data.DataManager;
 import fi.dy.masa.litematica.util.EasyPlaceUtils;
 import fi.dy.masa.litematica.util.WorldUtils;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.util.thread.ReentrantThreadExecutor;
 
 @Mixin(value = MinecraftClient.class)
 public abstract class MixinMinecraftClient extends ReentrantThreadExecutor<Runnable>

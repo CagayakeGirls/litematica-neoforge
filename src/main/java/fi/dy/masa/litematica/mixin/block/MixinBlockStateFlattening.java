@@ -2,9 +2,8 @@ package fi.dy.masa.litematica.mixin.block;
 
 import java.util.Arrays;
 import java.util.List;
-
-import com.mojang.serialization.Dynamic;
 import net.minecraft.datafixer.fix.BlockStateFlattening;
+import com.mojang.serialization.Dynamic;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;

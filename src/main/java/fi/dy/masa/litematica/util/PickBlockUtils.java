@@ -1,9 +1,6 @@
 package fi.dy.masa.litematica.util;
 
 import javax.annotation.Nullable;
-
-import org.jetbrains.annotations.ApiStatus;
-
 import net.minecraft.block.BlockState;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.client.MinecraftClient;
@@ -13,7 +10,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.util.Hand;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
-
+import org.jetbrains.annotations.ApiStatus;
 import fi.dy.masa.malilib.gui.GuiBase;
 import fi.dy.masa.malilib.registry.Registry;
 import fi.dy.masa.malilib.util.game.BlockUtils;
@@ -77,10 +74,14 @@ public class PickBlockUtils
         {
             double reach = mc.player.getBlockInteractionRange();
             Entity entity = mc.getCameraEntity();
-            pos = RayTraceUtils.getPickBlockLastTrace(world, entity, reach, true);
+
+			if (entity != null)
+			{
+				pos = RayTraceUtils.getPickBlockLastTrace(world, entity, reach, true);
+			}
         }
 
-        if (pos != null && PlacementUtils.isReplaceable(world, pos, true))
+        if (pos != null && world != null && PlacementUtils.isReplaceable(world, pos, true))
         {
             return doPickBlockForPosition(pos);
         }

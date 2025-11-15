@@ -3,19 +3,16 @@ package fi.dy.masa.litematica.materials.json;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-
-import fi.dy.masa.malilib.data.CachedTagUtils;
-import org.apache.commons.lang3.math.Fraction;
-import org.apache.commons.lang3.tuple.Pair;
-import org.apache.commons.lang3.tuple.Triple;
-
 import net.minecraft.item.Item;
 import net.minecraft.item.Items;
 import net.minecraft.recipe.Ingredient;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.registry.tag.ItemTags;
-
+import fi.dy.masa.malilib.data.CachedTagUtils;
+import org.apache.commons.lang3.math.Fraction;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.commons.lang3.tuple.Triple;
 import fi.dy.masa.litematica.data.CachedTagManager;
 
 public class MaterialListJsonOverrides

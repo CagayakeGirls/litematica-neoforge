@@ -1,6 +1,5 @@
 package fi.dy.masa.litematica.mixin.easyplace;
 
-import net.minecraft.client.MinecraftClient;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -8,6 +7,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import fi.dy.masa.litematica.config.Configs;
 import fi.dy.masa.litematica.util.EasyPlaceUtils;
+import net.minecraft.client.MinecraftClient;
 
 /**
  * Post Re-Write code

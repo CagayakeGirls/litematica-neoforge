@@ -1,15 +1,15 @@
 package fi.dy.masa.litematica.event;
 
+import fi.dy.masa.malilib.gui.Message.MessageType;
+import fi.dy.masa.malilib.hotkeys.*;
+import fi.dy.masa.malilib.util.GuiUtils;
+import fi.dy.masa.malilib.util.InfoUtils;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.Click;
 import net.minecraft.client.input.KeyInput;
 import net.minecraft.entity.Entity;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
-import fi.dy.masa.malilib.gui.Message.MessageType;
-import fi.dy.masa.malilib.hotkeys.*;
-import fi.dy.masa.malilib.util.GuiUtils;
-import fi.dy.masa.malilib.util.InfoUtils;
 import fi.dy.masa.litematica.Reference;
 import fi.dy.masa.litematica.config.Configs;
 import fi.dy.masa.litematica.config.Hotkeys;
@@ -129,7 +129,7 @@ public class InputHandler implements IKeybindProvider, IKeyboardInputHandler, IM
         ToolMode mode = DataManager.getToolMode();
         Entity entity = fi.dy.masa.malilib.util.EntityUtils.getCameraEntity();
 
-        if (Hotkeys.SELECTION_GRAB_MODIFIER.getKeybind().isKeybindHeld())
+        if (Hotkeys.SELECTION_GRAB_MODIFIER.getKeybind().isKeybindHeld() && entity != null)
         {
             if (mode.getUsesAreaSelection())
             {

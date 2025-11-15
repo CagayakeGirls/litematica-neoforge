@@ -3,7 +3,6 @@ package fi.dy.masa.litematica.util;
 import java.util.Iterator;
 import java.util.Optional;
 import javax.annotation.Nullable;
-import com.google.common.base.Splitter;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.ChestBlock;
@@ -17,7 +16,7 @@ import net.minecraft.state.property.Property;
 import net.minecraft.util.BlockMirror;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.Direction;
-
+import com.google.common.base.Splitter;
 import fi.dy.masa.litematica.schematic.conversion.SchematicConversionMaps;
 
 public class BlockUtils
@@ -68,7 +67,7 @@ public class BlockUtils
 	        blockName = SchematicConversionMaps.updateBlockName(blockName, minecraftDataVersion);
             Identifier id = Identifier.tryParse(blockName);
 
-            if (Registries.BLOCK.containsId(id))
+            if (id != null && Registries.BLOCK.containsId(id))
             {
                 Optional<RegistryEntry.Reference<Block>> opt = Registries.BLOCK.getEntry(id);
                 Block block;
@@ -148,7 +147,7 @@ public class BlockUtils
         {
             Identifier id = Identifier.tryParse(blockName);
 
-            if (Registries.BLOCK.containsId(id))
+            if (id != null && Registries.BLOCK.containsId(id))
             {
                 Block block = Registries.BLOCK.get(id);
 
@@ -165,15 +164,21 @@ public class BlockUtils
 
     public static Optional<TagKey<Block>> getBlockTagFromString(String str)
     {
-        if (str.startsWith("#")) {
-            try {
+        if (str.startsWith("#"))
+		{
+            try
+            {
                 String tagName = str.substring(1);
                 Identifier id = Identifier.tryParse(tagName);
 
-                TagKey<Block> blockTag = TagKey.of(RegistryKeys.BLOCK, id);
-                return Optional.of(blockTag);
-
-            } catch (Exception e) {
+				if (id != null)
+				{
+					TagKey<Block> blockTag = TagKey.of(RegistryKeys.BLOCK, id);
+					return Optional.of(blockTag);
+				}
+            }
+			catch (Exception e)
+            {
                 return Optional.empty();
             }
         }

@@ -2,8 +2,7 @@ package fi.dy.masa.litematica.world;
 
 import java.util.ArrayList;
 import java.util.List;
-
-import fi.dy.masa.litematica.Litematica;
+import javax.annotation.Nonnull;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockEntityProvider;
 import net.minecraft.block.BlockState;
@@ -16,6 +15,7 @@ import net.minecraft.util.math.ChunkPos;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.ChunkSection;
 import net.minecraft.world.chunk.WorldChunk;
+import fi.dy.masa.litematica.Litematica;
 
 public class ChunkSchematic extends WorldChunk
 {
@@ -39,7 +39,7 @@ public class ChunkSchematic extends WorldChunk
     }
 
     @Override
-    public BlockState getBlockState(BlockPos pos)
+    public @Nonnull BlockState getBlockState(BlockPos pos)
     {
         int x = pos.getX() & 0xF;
         int y = pos.getY();
@@ -63,7 +63,7 @@ public class ChunkSchematic extends WorldChunk
     }
 
     @Override
-    public BlockState setBlockState(BlockPos pos, BlockState state, int isMoving)
+    public BlockState setBlockState(@Nonnull BlockPos pos, @Nonnull BlockState state, int isMoving)
     {
         BlockState stateOld = this.getBlockState(pos);
         int y = pos.getY();
@@ -139,7 +139,7 @@ public class ChunkSchematic extends WorldChunk
 
     @SuppressWarnings("deprecation")
     @Override
-    public void addEntity(Entity entity)
+    public void addEntity(@Nonnull Entity entity)
     {
         this.entityList.forEach(
                 (ent ->

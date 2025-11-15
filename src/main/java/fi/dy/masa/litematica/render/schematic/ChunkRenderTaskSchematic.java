@@ -3,9 +3,9 @@ package fi.dy.masa.litematica.render.schematic;
 import java.util.List;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
+import net.minecraft.util.math.Vec3d;
 import com.google.common.collect.Lists;
 import com.google.common.primitives.Doubles;
-import net.minecraft.util.math.Vec3d;
 import fi.dy.masa.litematica.Litematica;
 
 public class ChunkRenderTaskSchematic implements Comparable<ChunkRenderTaskSchematic>

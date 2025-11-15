@@ -2,12 +2,11 @@ package fi.dy.masa.litematica.render.schematic;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.util.ArrayList;
-import java.util.concurrent.ConcurrentHashMap;
-
 import net.minecraft.client.render.BlockRenderLayer;
 import net.minecraft.client.render.BuiltBuffer;
 import net.minecraft.client.render.RenderLayer;
+import java.util.ArrayList;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class BuiltBufferCache implements AutoCloseable
 {

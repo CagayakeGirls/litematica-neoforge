@@ -3,24 +3,19 @@ package fi.dy.masa.litematica.render.schematic;
 import java.lang.Math;
 import java.util.*;
 import javax.annotation.Nullable;
-import org.joml.*;
-
-import com.mojang.blaze3d.buffers.GpuBuffer;
-import com.mojang.blaze3d.buffers.GpuBufferSlice;
-import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.systems.RenderPass;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.GpuTextureView;
-import com.mojang.blaze3d.vertex.VertexFormat;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockRenderType;
 import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gl.DynamicUniforms;
 import net.minecraft.client.gl.Framebuffer;
-import net.minecraft.client.render.*;
+import net.minecraft.client.render.BlockRenderLayer;
+import net.minecraft.client.render.BlockRenderLayerGroup;
+import net.minecraft.client.render.BufferBuilder;
+import net.minecraft.client.render.Camera;
+import net.minecraft.client.render.Frustum;
+import net.minecraft.client.render.RenderTickCounter;
 import net.minecraft.client.render.block.BlockRenderManager;
 import net.minecraft.client.render.block.entity.BlockEntityRenderManager;
 import net.minecraft.client.render.block.entity.state.BlockEntityRenderState;
@@ -35,20 +30,38 @@ import net.minecraft.client.render.state.WorldRenderState;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.PlayerLikeEntity;
-import net.minecraft.entity.passive.*;
+import net.minecraft.entity.passive.AbstractHorseEntity;
+import net.minecraft.entity.passive.CodEntity;
+import net.minecraft.entity.passive.SalmonEntity;
+import net.minecraft.entity.passive.TadpoleEntity;
+import net.minecraft.entity.passive.TropicalFishEntity;
+import net.minecraft.entity.passive.WaterAnimalEntity;
 import net.minecraft.fluid.Fluid;
 import net.minecraft.fluid.FluidState;
 import net.minecraft.fluid.Fluids;
 import net.minecraft.state.property.Property;
+import net.minecraft.util.Identifier;
 import net.minecraft.util.crash.CrashException;
 import net.minecraft.util.crash.CrashReport;
 import net.minecraft.util.crash.CrashReportSection;
-import net.minecraft.util.math.*;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.ChunkPos;
+import net.minecraft.util.math.ColorHelper;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.math.random.Random;
 import net.minecraft.util.profiler.Profiler;
 import net.minecraft.util.profiler.Profilers;
 import net.minecraft.world.BlockRenderView;
+import org.joml.*;
 
+import com.mojang.blaze3d.buffers.GpuBuffer;
+import com.mojang.blaze3d.buffers.GpuBufferSlice;
+import com.mojang.blaze3d.pipeline.RenderPipeline;
+import com.mojang.blaze3d.systems.RenderPass;
+import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.textures.GpuTextureView;
+import com.mojang.blaze3d.vertex.VertexFormat;
 import fi.dy.masa.malilib.render.RenderUtils;
 import fi.dy.masa.malilib.util.EntityUtils;
 import fi.dy.masa.malilib.util.LayerRange;
@@ -75,7 +88,6 @@ public class WorldRendererSchematic
     private final Set<BlockEntity> blockEntities;
     private final List<ChunkRendererSchematicVbo> renderInfos;
     private final SchematicRenderState schematicRenderState;
-	private final HashMap<Block, Block> fallbackBlocks;
     private Set<ChunkRendererSchematicVbo> chunksToUpdate;
     private WorldSchematic world;
     private ChunkRenderDispatcherSchematic chunkRendererDispatcher;
@@ -122,13 +134,10 @@ public class WorldRendererSchematic
         this.fogRenderer = ((IMixinGameRenderer) mc.gameRenderer).litematica_getFogRenderer();
 		this.schematicRenderState = new SchematicRenderState();
 	    this.chunksToUpdate = new LinkedHashSet<>();
-		this.fallbackBlocks = new HashMap<>();
         this.profiler = null;
         this.vanillaFogBuffer = null;
         this.batchDraw = null;
         this.shouldDraw = false;
-		this.buildFallbackBlocks();
-
 	    this.lastCameraChunkUpdateX = Double.MIN_VALUE;
 	    this.lastCameraChunkUpdateY = Double.MIN_VALUE;
 	    this.lastCameraChunkUpdateZ = Double.MIN_VALUE;
@@ -156,12 +165,12 @@ public class WorldRendererSchematic
     {
         int rcTotal = this.chunkRendererDispatcher != null ? this.chunkRendererDispatcher.getRendererCount() : 0;
         int rcRendered = this.chunkRendererDispatcher != null ? this.getRenderedChunks() : 0;
-        return String.format("C: %d/%d %sD: %d, L: %d, %s", rcRendered, rcTotal, this.mc.chunkCullingEnabled ? "(s) " : "", this.renderDistanceChunks, 0, this.renderDispatcher == null ? "null" : this.renderDispatcher.getDebugInfo());
+        return String.format("C: %02d/%02d %sD: %02d, L: %02d, %s", rcRendered, rcTotal, this.mc.chunkCullingEnabled ? "(s) " : "", this.renderDistanceChunks, 0, this.renderDispatcher == null ? "null" : this.renderDispatcher.getDebugInfo());
     }
 
     public String getDebugInfoEntities()
     {
-        return "E: " + this.countEntitiesRendered + "/" + this.countEntitiesTotal + ", B: " + this.countEntitiesHidden;
+		return String.format("E: %02d/%02d, B: %02d", this.countEntitiesRendered, this.countEntitiesTotal, this.countEntitiesHidden);
     }
 
     protected ChunkRenderDispatcherLitematica getRenderDispatcher()
@@ -209,54 +218,17 @@ public class WorldRendererSchematic
         return this.blockEntityRenderManager;
     }
 
-	private void buildFallbackBlocks()
-	{
-		this.fallbackBlocks.put(Blocks.BLACK_STAINED_GLASS, FallbackBlocks.BLACK_GLASS);
-		this.fallbackBlocks.put(Blocks.BLUE_STAINED_GLASS, FallbackBlocks.BLUE_GLASS);
-		this.fallbackBlocks.put(Blocks.BROWN_STAINED_GLASS, FallbackBlocks.BROWN_GLASS);
-		this.fallbackBlocks.put(Blocks.CYAN_STAINED_GLASS, FallbackBlocks.CYAN_GLASS);
-		this.fallbackBlocks.put(Blocks.GLASS, FallbackBlocks.GLASS);
-		this.fallbackBlocks.put(Blocks.GRAY_STAINED_GLASS, FallbackBlocks.GRAY_GLASS);
-		this.fallbackBlocks.put(Blocks.GREEN_STAINED_GLASS, FallbackBlocks.GREEN_GLASS);
-		this.fallbackBlocks.put(Blocks.LIME_STAINED_GLASS, FallbackBlocks.LIME_GLASS);
-		this.fallbackBlocks.put(Blocks.LIGHT_BLUE_STAINED_GLASS, FallbackBlocks.LT_BLUE_GLASS);
-		this.fallbackBlocks.put(Blocks.LIGHT_GRAY_STAINED_GLASS, FallbackBlocks.LT_GRAY_GLASS);
-		this.fallbackBlocks.put(Blocks.MAGENTA_STAINED_GLASS, FallbackBlocks.MAGENTA_GLASS);
-		this.fallbackBlocks.put(Blocks.ORANGE_STAINED_GLASS, FallbackBlocks.ORANGE_GLASS);
-		this.fallbackBlocks.put(Blocks.PINK_STAINED_GLASS, FallbackBlocks.PINK_GLASS);
-		this.fallbackBlocks.put(Blocks.PURPLE_STAINED_GLASS, FallbackBlocks.PURPLE_GLASS);
-		this.fallbackBlocks.put(Blocks.RED_STAINED_GLASS, FallbackBlocks.RED_GLASS);
-		this.fallbackBlocks.put(Blocks.TINTED_GLASS, FallbackBlocks.TINTED_GLASS);
-		this.fallbackBlocks.put(Blocks.WHITE_STAINED_GLASS, FallbackBlocks.WHITE_GLASS);
-		this.fallbackBlocks.put(Blocks.YELLOW_STAINED_GLASS, FallbackBlocks.YELLOW_GLASS);
-
-		this.fallbackBlocks.put(Blocks.BLACK_STAINED_GLASS_PANE, FallbackBlocks.BLACK_GLASS_PANE);
-		this.fallbackBlocks.put(Blocks.BLUE_STAINED_GLASS_PANE, FallbackBlocks.BLUE_GLASS_PANE);
-		this.fallbackBlocks.put(Blocks.BROWN_STAINED_GLASS_PANE, FallbackBlocks.BROWN_GLASS_PANE);
-		this.fallbackBlocks.put(Blocks.CYAN_STAINED_GLASS_PANE, FallbackBlocks.CYAN_GLASS_PANE);
-		this.fallbackBlocks.put(Blocks.GLASS_PANE, FallbackBlocks.GLASS_PANE);
-		this.fallbackBlocks.put(Blocks.GRAY_STAINED_GLASS_PANE, FallbackBlocks.GRAY_GLASS_PANE);
-		this.fallbackBlocks.put(Blocks.GREEN_STAINED_GLASS_PANE, FallbackBlocks.GREEN_GLASS_PANE);
-		this.fallbackBlocks.put(Blocks.LIME_STAINED_GLASS_PANE, FallbackBlocks.LIME_GLASS_PANE);
-		this.fallbackBlocks.put(Blocks.LIGHT_BLUE_STAINED_GLASS_PANE, FallbackBlocks.LT_BLUE_GLASS_PANE);
-		this.fallbackBlocks.put(Blocks.LIGHT_GRAY_STAINED_GLASS_PANE, FallbackBlocks.LT_GRAY_GLASS_PANE);
-		this.fallbackBlocks.put(Blocks.MAGENTA_STAINED_GLASS_PANE, FallbackBlocks.MAGENTA_GLASS_PANE);
-		this.fallbackBlocks.put(Blocks.ORANGE_STAINED_GLASS_PANE, FallbackBlocks.ORANGE_GLASS_PANE);
-		this.fallbackBlocks.put(Blocks.PINK_STAINED_GLASS_PANE, FallbackBlocks.PINK_GLASS_PANE);
-		this.fallbackBlocks.put(Blocks.PURPLE_STAINED_GLASS_PANE, FallbackBlocks.PURPLE_GLASS_PANE);
-		this.fallbackBlocks.put(Blocks.RED_STAINED_GLASS_PANE, FallbackBlocks.RED_GLASS_PANE);
-		this.fallbackBlocks.put(Blocks.WHITE_STAINED_GLASS_PANE, FallbackBlocks.WHITE_GLASS_PANE);
-		this.fallbackBlocks.put(Blocks.YELLOW_STAINED_GLASS_PANE, FallbackBlocks.YELLOW_GLASS_PANE);
-	}
-
 	private <T extends Comparable<T>> BlockState getFallbackState(BlockState origState)
 	{
 		Collection<Property<?>> props = origState.getProperties();
+		Block block = origState.getBlock();
 
-		if (this.fallbackBlocks.containsKey(origState.getBlock()))
+		if (FallbackBlocks.BLOCK_TO_ID.containsKey(block))
 		{
+			Identifier id = FallbackBlocks.BLOCK_TO_ID.get(block);
+
 //			Litematica.LOGGER.warn("getFallbackState: Invalid Block State/Block Model for block [{}]; but we found a matching Litematica fallback block state that you can use.  Perhaps you have the Fusion mod installed?", origState.getBlock().getName().getString());
-			BlockState newState = this.fallbackBlocks.get(origState.getBlock()).getDefaultState();
+			BlockState newState = FallbackBlocks.ID_TO_STATE_MANAGER.get(id).getDefaultState();
 
 			for (Property<?> entry : props)
 			{
@@ -274,7 +246,7 @@ public class WorldRendererSchematic
 				}
 			}
 
-			Litematica.debugLog("Fallback Block State -- OLD: %s --> NEW: %s", origState.toString(), newState.toString());
+//			Litematica.debugLog("Fallback Block State -- OLD: [{}] --> NEW: [{}]", origState.toString(), newState.toString());
 			return newState;
 		}
 
@@ -1038,7 +1010,7 @@ public class WorldRendererSchematic
 
         for (Direction entry : Direction.values())
         {
-            List<BakedQuad> list = part.getQuads(side);
+            List<BakedQuad> list = part.getQuads(entry);
 
             if (!list.isEmpty())
             {
@@ -1060,7 +1032,7 @@ public class WorldRendererSchematic
 
         for (Direction entry : Direction.values())
         {
-            List<BakedQuad> list = modelPart.getQuads(side);
+            List<BakedQuad> list = modelPart.getQuads(entry);
 
             if (!list.isEmpty())
             {
@@ -1098,7 +1070,7 @@ public class WorldRendererSchematic
 
     public void prepareEntities(Camera camera, Frustum frustum, WorldRenderState renderStates, RenderTickCounter tickCounter, Profiler profiler)
     {
-        // Litematica.LOGGER.warn("prepareEntities()");
+//        Litematica.LOGGER.warn("prepareEntities()");
         this.profiler = profiler;
 
         if (this.renderEntitiesStartupCounter > 0)
@@ -1207,7 +1179,7 @@ public class WorldRendererSchematic
 
 	public void renderEntities(Camera camera, Frustum frustum, MatrixStack matrices, WorldRenderState renderStates, OrderedRenderCommandQueue queue, Profiler profiler)
 	{
-        // Litematica.LOGGER.warn("renderEntities()");
+//        Litematica.LOGGER.warn("renderEntities()");
         if (this.schematicRenderState.entityStates.isEmpty())
         {
             return;
@@ -1233,7 +1205,7 @@ public class WorldRendererSchematic
 
 	public void prepareBlockEntities(Camera camera, Frustum frustum, WorldRenderState renderStates, MatrixStack matrices, float tickProgress, Profiler profiler)
     {
-        // Litematica.LOGGER.warn("prepareBlockEntities()");
+//        Litematica.LOGGER.warn("prepareBlockEntities()");
         this.profiler = profiler;
         profiler.push("block_entities_prepare");
 
@@ -1320,7 +1292,7 @@ public class WorldRendererSchematic
 
 	public void renderBlockEntities(Camera camera, Frustum frustum, MatrixStack matrices, WorldRenderState renderStates, OrderedRenderCommandQueue queue, Profiler profiler)
 	{
-        // Litematica.LOGGER.warn("renderBlockEntities()");
+//        Litematica.LOGGER.warn("renderBlockEntities()");
         if (this.schematicRenderState.tileEntityStates.isEmpty())
         {
             return;

@@ -1,6 +1,12 @@
 package fi.dy.masa.litematica.render.schematic;
 
 import javax.annotation.Nonnull;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.render.BlockRenderLayer;
+import net.minecraft.client.render.BuiltBuffer;
+import net.minecraft.client.util.BufferAllocator;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.profiler.Profiler;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Queue;
@@ -12,15 +18,8 @@ import com.google.common.primitives.Doubles;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListenableFutureTask;
-import org.apache.logging.log4j.Logger;
 import com.mojang.blaze3d.systems.VertexSorter;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.render.BlockRenderLayer;
-import net.minecraft.client.render.BuiltBuffer;
-import net.minecraft.client.util.BufferAllocator;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.util.profiler.Profiler;
-
+import org.apache.logging.log4j.Logger;
 import fi.dy.masa.litematica.Litematica;
 import fi.dy.masa.litematica.config.Configs;
 
@@ -228,13 +227,7 @@ public class ChunkRenderDispatcherLitematica
         {
             final ChunkRenderTaskSchematic generator = renderChunk.makeCompileTaskChunkSchematic(this::getCameraPos);
 
-            generator.addFinishRunnable(new Runnable()
-            {
-                public void run()
-                {
-                    ChunkRenderDispatcherLitematica.this.queueChunkUpdates.remove(generator);
-                }
-            });
+            generator.addFinishRunnable(() -> ChunkRenderDispatcherLitematica.this.queueChunkUpdates.remove(generator));
 
             boolean flag = this.queueChunkUpdates.offer(generator);
 
@@ -375,14 +368,7 @@ public class ChunkRenderDispatcherLitematica
                 return flag;
             }
 
-            generator.addFinishRunnable(new Runnable()
-            {
-                @Override
-                public void run()
-                {
-                    ChunkRenderDispatcherLitematica.this.queueChunkUpdates.remove(generator);
-                }
-            });
+            generator.addFinishRunnable(() -> ChunkRenderDispatcherLitematica.this.queueChunkUpdates.remove(generator));
 
             flag = this.queueChunkUpdates.offer(generator);
         }
@@ -424,14 +410,7 @@ public class ChunkRenderDispatcherLitematica
                     null);
              */
 
-            ListenableFutureTask<Object> futureTask = ListenableFutureTask.<Object>create(new Runnable()
-            {
-                @Override
-                public void run()
-                {
-                    ChunkRenderDispatcherLitematica.this.uploadChunkBlocks(layer, allocators, renderChunk, chunkRenderData, distanceSq, resortOnly, profiler);
-                }
-            }, null);
+            ListenableFutureTask<Object> futureTask = ListenableFutureTask.create(() -> ChunkRenderDispatcherLitematica.this.uploadChunkBlocks(layer, allocators, renderChunk, chunkRenderData, distanceSq, resortOnly, profiler), null);
 
             synchronized (this.queueChunkUploads)
             {
@@ -466,14 +445,7 @@ public class ChunkRenderDispatcherLitematica
         else
         {
             profiler.swap("upload_chunk_overlay_later");
-            ListenableFutureTask<Object> futureTask = ListenableFutureTask.<Object>create(new Runnable()
-            {
-                @Override
-                public void run()
-                {
-                    ChunkRenderDispatcherLitematica.this.uploadChunkOverlay(type, allocators, renderChunk, compiledChunk, distanceSq, resortOnly, profiler);
-                }
-            }, null);
+            ListenableFutureTask<Object> futureTask = ListenableFutureTask.<Object>create(() -> ChunkRenderDispatcherLitematica.this.uploadChunkOverlay(type, allocators, renderChunk, compiledChunk, distanceSq, resortOnly, profiler), null);
 
             synchronized (this.queueChunkUploads)
             {

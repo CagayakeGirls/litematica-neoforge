@@ -4,13 +4,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
-
+import net.minecraft.client.render.BlockRenderLayer;
+import net.minecraft.client.render.RenderLayer;
 import org.apache.commons.lang3.tuple.Pair;
 
 import com.mojang.blaze3d.pipeline.RenderPipeline;
-import net.minecraft.client.render.BlockRenderLayer;
-import net.minecraft.client.render.RenderLayer;
-
 import fi.dy.masa.malilib.render.MaLiLibPipelines;
 
 public record ChunkRenderLayers()

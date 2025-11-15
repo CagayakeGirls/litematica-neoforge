@@ -1,16 +1,17 @@
 package fi.dy.masa.litematica.world;
 
 import com.google.common.collect.Iterables;
-import net.minecraft.util.TypeFilter;
-import net.minecraft.util.function.LazyIterationConsumer;
-import net.minecraft.util.math.Box;
-import net.minecraft.world.entity.EntityLike;
-import net.minecraft.world.entity.EntityLookup;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
+import javax.annotation.Nonnull;
+import net.minecraft.util.TypeFilter;
+import net.minecraft.util.function.LazyIterationConsumer;
+import net.minecraft.util.math.Box;
+import net.minecraft.world.entity.EntityLike;
+import net.minecraft.world.entity.EntityLookup;
 
 public class SchematicEntityLookup<T extends EntityLike> implements EntityLookup<T>, AutoCloseable
 {
@@ -104,7 +105,7 @@ public class SchematicEntityLookup<T extends EntityLike> implements EntityLookup
     }
 
     @Override
-    public @Nullable T get(UUID uuid)
+    public @Nullable T get(@Nonnull UUID uuid)
     {
         if (this.uuidMap.containsKey(uuid))
         {
@@ -145,13 +146,13 @@ public class SchematicEntityLookup<T extends EntityLike> implements EntityLookup
     }
 
     @Override
-    public Iterable<T> iterate()
+    public @Nonnull Iterable<T> iterate()
     {
         return Iterables.unmodifiableIterable(this.entityMap.values());
     }
 
     @Override
-    public void forEachIntersects(Box box, Consumer<T> action)
+    public void forEachIntersects(@Nonnull Box box, @Nonnull Consumer<T> action)
     {
         this.entityMap.forEach(
                 (id, e) ->
@@ -169,7 +170,7 @@ public class SchematicEntityLookup<T extends EntityLike> implements EntityLookup
     }
 
     @Override
-    public <U extends T> void forEachIntersects(TypeFilter<T, U> filter, Box box, LazyIterationConsumer<U> consumer)
+    public <U extends T> void forEachIntersects(@Nonnull TypeFilter<T, U> filter, @Nonnull Box box, @Nonnull LazyIterationConsumer<U> consumer)
     {
         this.entityMap.forEach(
                 (id, e) ->
@@ -187,7 +188,7 @@ public class SchematicEntityLookup<T extends EntityLike> implements EntityLookup
     }
 
     @Override
-    public <U extends T> void forEach(TypeFilter<T, U> filter, LazyIterationConsumer<U> consumer)
+    public <U extends T> void forEach(@Nonnull TypeFilter<T, U> filter, @Nonnull LazyIterationConsumer<U> consumer)
     {
         this.entityMap.forEach(
                 (id, e) ->

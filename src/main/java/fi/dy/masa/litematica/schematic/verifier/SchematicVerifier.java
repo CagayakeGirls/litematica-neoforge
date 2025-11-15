@@ -2,14 +2,6 @@ package fi.dy.masa.litematica.schematic.verifier;
 
 import java.util.*;
 import javax.annotation.Nullable;
-import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.HashMultimap;
-import com.google.common.collect.Lists;
-import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
-import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
-import org.apache.commons.lang3.tuple.MutablePair;
-import org.apache.commons.lang3.tuple.Pair;
-
 import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.world.ClientWorld;
@@ -19,7 +11,13 @@ import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.Direction;
 import net.minecraft.util.profiler.Profiler;
 import net.minecraft.world.chunk.Chunk;
-
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Lists;
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
+import org.apache.commons.lang3.tuple.MutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import fi.dy.masa.malilib.gui.GuiBase;
 import fi.dy.masa.malilib.gui.Message.MessageType;
 import fi.dy.masa.malilib.interfaces.ICompletionListener;
@@ -90,10 +88,10 @@ public class SchematicVerifier extends TaskBase implements IInfoHudRenderer
 
     public static void markVerifierBlockChanges(BlockPos pos)
     {
-        for (int i = 0; i < ACTIVE_VERIFIERS.size(); ++i)
-        {
-            ACTIVE_VERIFIERS.get(i).markBlockChanged(pos);
-        }
+	    for (SchematicVerifier activeVerifier : ACTIVE_VERIFIERS)
+	    {
+		    activeVerifier.markBlockChanged(pos);
+	    }
     }
 
     @Override
@@ -1055,7 +1053,7 @@ public class SchematicVerifier extends TaskBase implements IInfoHudRenderer
         private final String colorCode;
         private final Color4f color;
 
-        private MismatchType(int color, String unlocName, String colorCode)
+        MismatchType(int color, String unlocName, String colorCode)
         {
             this.color = Color4f.fromColor(color, 1f);
             this.unlocName = unlocName;

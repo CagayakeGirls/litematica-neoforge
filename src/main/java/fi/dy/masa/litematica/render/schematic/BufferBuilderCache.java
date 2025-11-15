@@ -1,14 +1,13 @@
 package fi.dy.masa.litematica.render.schematic;
 
 import javax.annotation.Nonnull;
-import java.util.ArrayList;
-import java.util.concurrent.ConcurrentHashMap;
-
-import fi.dy.masa.malilib.mixin.render.IMixinBufferBuilder;
 import net.minecraft.client.render.BlockRenderLayer;
 import net.minecraft.client.render.BufferBuilder;
 import net.minecraft.client.render.BuiltBuffer;
 import net.minecraft.client.render.RenderLayer;
+import java.util.ArrayList;
+import java.util.concurrent.ConcurrentHashMap;
+import fi.dy.masa.malilib.mixin.render.IMixinBufferBuilder;
 
 public class BufferBuilderCache implements AutoCloseable
 {

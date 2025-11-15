@@ -1,9 +1,8 @@
 package fi.dy.masa.litematica.scheduler;
 
-import net.minecraft.client.MinecraftClient;
-
 import fi.dy.masa.malilib.interfaces.IClientTickHandler;
 import fi.dy.masa.malilib.util.EntityUtils;
+import net.minecraft.client.MinecraftClient;
 import fi.dy.masa.litematica.config.Configs;
 import fi.dy.masa.litematica.data.DataManager;
 import fi.dy.masa.litematica.selection.SelectionManager;

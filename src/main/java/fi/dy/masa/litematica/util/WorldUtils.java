@@ -39,16 +39,16 @@ import net.minecraft.world.chunk.ChunkStatus;
 
 import fi.dy.masa.malilib.gui.Message.MessageType;
 import fi.dy.masa.malilib.interfaces.IStringConsumer;
-import fi.dy.masa.malilib.util.game.BlockUtils;
 import fi.dy.masa.malilib.util.*;
+import fi.dy.masa.malilib.util.game.BlockUtils;
 import fi.dy.masa.malilib.util.game.wrap.GameWrap;
 import fi.dy.masa.litematica.Litematica;
 import fi.dy.masa.litematica.config.Configs;
 import fi.dy.masa.litematica.config.Hotkeys;
 import fi.dy.masa.litematica.data.DataManager;
 import fi.dy.masa.litematica.materials.MaterialCache;
-import fi.dy.masa.litematica.mixin.entity.IMixinSignBlockEntity;
 import fi.dy.masa.litematica.mixin.block.IMixinWallMountedBlock;
+import fi.dy.masa.litematica.mixin.entity.IMixinSignBlockEntity;
 import fi.dy.masa.litematica.schematic.LitematicaSchematic;
 import fi.dy.masa.litematica.schematic.SchematicMetadata;
 import fi.dy.masa.litematica.schematic.SchematicaSchematic;
@@ -413,7 +413,7 @@ public class WorldUtils
 
         if (v7LitematicaSchematic == null)
         {
-            feedback.setString("litematica.error.schematic_conversion.litematica_to_schematic.failed_to_read_schematic");
+            feedback.setString("litematica.error.schematic_conversion.litematic_to_litematica.failed_to_read_schematic");
             return false;
         }
 
@@ -426,7 +426,7 @@ public class WorldUtils
         }
         else
         {
-            feedback.setString("litematica.error.schematic_conversion.litematica_to_schematic.failed_to_downgrade_litematic");
+            feedback.setString("litematica.error.schematic_conversion.litematic_to_litematica.failed_to_downgrade_litematic");
             return false;
         }
     }
@@ -445,7 +445,7 @@ public class WorldUtils
 
         if (litematicaSchematic == null)
         {
-            feedback.setString("litematica.error.schematic_conversion.litematica_to_schematic.failed_to_read_schematic");
+            feedback.setString("litematica.error.schematic_conversion.litematic_to_structure.failed_to_read_litematic");
             return null;
         }
 

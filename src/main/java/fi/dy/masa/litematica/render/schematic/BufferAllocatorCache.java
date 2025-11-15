@@ -3,12 +3,11 @@ package fi.dy.masa.litematica.render.schematic;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
-
+//import net.fabricmc.api.EnvType;
+//import net.fabricmc.api.Environment;
 import net.minecraft.client.render.BlockRenderLayer;
 import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.util.BufferAllocator;
-//import net.fabricmc.api.EnvType;
-//import net.fabricmc.api.Environment;
 
 //@Environment(EnvType.CLIENT)
 public class BufferAllocatorCache implements AutoCloseable

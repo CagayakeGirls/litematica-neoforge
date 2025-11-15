@@ -1,42 +1,30 @@
 package fi.dy.masa.litematica.mixin.hud;
 
-import java.util.List;
-import java.util.Map;
-
-import net.minecraft.client.gui.hud.debug.DebugHudEntryVisibility;
-import net.minecraft.client.gui.hud.debug.DebugHudProfile;
-import net.minecraft.util.Identifier;
-import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import fi.dy.masa.litematica.render.LitematicaDebugHud;
+import net.minecraft.client.gui.hud.debug.DebugHudProfile;
 
 @Mixin(DebugHudProfile.class)
 public abstract class MixinDebugHudProfile
 {
-	@Shadow @Final private List<Identifier> visibleEntries;
-	@Shadow public abstract boolean isF3Enabled();
-
-	@Shadow
-	private Map<Identifier, DebugHudEntryVisibility> visibilityMap;
-
 	@Inject(method = "updateVisibleEntries", at = @At("TAIL"))
-	private void litematica_insertVisiblePosition(CallbackInfo ci)
+	private void litematica_updateVisibleEntries(CallbackInfo ci)
 	{
-		if (!this.visibilityMap.containsKey(LitematicaDebugHud.LITEMATICA_DEBUG))
-		{
-//			Litematica.LOGGER.info("DebugHudProfile: Insert Missing Entry into visibilityMap.");
-			this.visibilityMap.put(LitematicaDebugHud.LITEMATICA_DEBUG, DebugHudEntryVisibility.IN_F3);
-		}
+		LitematicaDebugHud.INSTANCE.checkConfig();
 
-		if (this.isF3Enabled())
-		{
-			this.visibleEntries.remove(LitematicaDebugHud.LITEMATICA_DEBUG);
-			this.visibleEntries.addFirst(LitematicaDebugHud.LITEMATICA_DEBUG);
-		}
+//		// Shift to right side to "get out of the way" from the "Player position" display.
+//		if (LitematicaDebugHud.INSTANCE.getMode() == DebugHudMode.VANILLA &&
+//			this.visibleEntries.contains(LitematicaDebugHud.LITEMATICA_DEBUG))
+//		{
+//			if (LitematicaDebugHud.INSTANCE.shouldUseFallback())
+//			{
+//				Litematica.LOGGER.error("FALLBACK: {}", this.visibleEntries.toString());
+//				this.visibleEntries.remove(LitematicaDebugHud.LITEMATICA_DEBUG);
+//			}
+//		}
 	}
 }

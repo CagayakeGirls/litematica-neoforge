@@ -3,11 +3,10 @@ package fi.dy.masa.litematica.data;
 import fi.dy.masa.litematica.Reference;
 import fi.dy.masa.malilib.data.CachedItemTags;
 import fi.dy.masa.malilib.data.CachedTagKey;
-import net.minecraft.item.Items;
-import net.minecraft.registry.Registries;
-
 import java.util.ArrayList;
 import java.util.List;
+import net.minecraft.item.Items;
+import net.minecraft.registry.Registries;
 
 /**
  * Caches Block/Item Tags as if they are real Vanilla Block/Item tags.
