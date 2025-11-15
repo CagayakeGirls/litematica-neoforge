@@ -12,9 +12,9 @@ public class SodiumCompat
     {
         hasSodium = ModPlatform.isModLoaded(SODIUM);
 
-		if (FabricLoader.getInstance().getModContainer(SODIUM).isPresent())
+		if (ModPlatform.getModContainer(SODIUM).isPresent())
 		{
-			version = FabricLoader.getInstance().getModContainer(SODIUM).get().getMetadata().getVersion().getFriendlyString();
+			version = ModPlatform.getModContainer(SODIUM).get().getModInfo().getVersion().toString();
 		}
     }
 
