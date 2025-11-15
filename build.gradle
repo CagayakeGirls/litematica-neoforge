@@ -145,4 +145,6 @@ publisher {
     setCurseEnvironment("${libs.versions.version.env.get()}")
     setArtifact(remapJar)
     addAdditionalFile(sourcesJar)
+	curseDepends.required("mafglib")
+    modrinthDepends.required("mafglib")
 }
