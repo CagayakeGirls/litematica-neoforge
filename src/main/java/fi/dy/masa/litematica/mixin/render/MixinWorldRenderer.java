@@ -86,7 +86,7 @@ public abstract class MixinWorldRenderer
         this.litematica$prepareProfiler();
         LitematicaRenderer.getInstance().piecewiseUpdate(camera, this.profiler);
 
-        if (IrisCompat.hasSodium())
+        if (IrisCompat.hasIris())
         {
             LitematicaRenderer.getInstance().scheduleTranslucentSorting(camera.getPos(), this.profiler);
         }

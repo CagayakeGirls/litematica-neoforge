@@ -1,2 +1,2 @@
 ## Changelog
-- update NeoForge version `21.10.52-beta` -> `21.10.63`
+- sync upstream `1.21.10-0.24.7`

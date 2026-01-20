@@ -14,13 +14,12 @@ platformId-modrinth = "dCKRaeBC"
 
 yarn-patch = "1.21+build.4"
 
-koom = "1.13-SNAPSHOT"
+architectury-loom = "1.13-SNAPSHOT"
 modpublisher = "2.+"
 
 [libraries]
 yarn-patch = { group = "dev.architectury", name = "yarn-mappings-patch-neoforge", version.ref = "yarn-patch" }
 
 [plugins]
-koom = { id = "band.kessoku.koom", version.ref = "koom" }
-architectury-loom = { id = "dev.architectury.loom", version.ref = "koom" }
+architectury-loom = { id = "dev.architectury.loom", version.ref = "architectury-loom" }
 modpublisher = { id = "com.hypherionmc.modutils.modpublisher", version.ref = "modpublisher" }

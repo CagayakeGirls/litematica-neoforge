@@ -1,7 +1,8 @@
 plugins {
+	id 'team.cagayakegirls.scripts'
+	id 'dev.architectury.loom'
 	id 'maven-publish'
-    alias(libs.plugins.koom)
-    alias(libs.plugins.modpublisher)
+	alias(libs.plugins.modpublisher)
 }
 
 repositories {
@@ -15,15 +16,11 @@ repositories {
 		content { includeGroupAndSubgroups("com.terraformersmc")}
 	}
 	maven { url = 'https://jitpack.io' }
-    maven { url = 'https://maven.kessokuteatime.work/snapshots/'}
 }
 
 dependencies {
 	minecraft "com.mojang:minecraft:${project.minecraft_version}"
-    mappings loom.layered {
-        mappings("net.fabricmc:yarn:${project.mappings_version}:v2")
-        mappings(libs.yarn.patch)
-    }
+	mappings extraMappings.yarnWithPatch("${project.mappings_version}", libs.versions.yarn.patch.get())
 	neoForge "net.neoforged:neoforge:${project.neoforge_version}"
 	implementation "com.google.code.findbugs:jsr305:3.0.2"
 
@@ -112,6 +109,8 @@ jar {
 		rename { "${it}_${base.archivesName}"}
 	}
 }
+
+remapJar.atAccessWideners.add("litematica.accesswidener")
 
 tasks.publish.dependsOn build
 publishing {
