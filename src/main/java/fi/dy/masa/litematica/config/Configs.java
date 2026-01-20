@@ -58,6 +58,7 @@ public class Configs implements IConfigHandler
         public static final ConfigString        COMMAND_NAME_SUMMON         = new ConfigString( "commandNameSummon", "summon").apply(GENERIC_KEY);
         public static final ConfigInteger       COMMAND_TASK_INTERVAL       = new ConfigInteger("commandTaskInterval", 1, 1, 1000).apply(GENERIC_KEY);
         public static final ConfigBoolean       COMMAND_USE_WORLDEDIT       = new ConfigBoolean("commandUseWorldEdit", false).apply(GENERIC_KEY);
+        public static final ConfigBoolean       COMMAND_USE_STRICT          = new ConfigBoolean("commandUseStrict", true).apply(GENERIC_KEY);
         public static final ConfigBoolean       DEBUG_LOGGING               = new ConfigBoolean("debugLogging", false).apply(GENERIC_KEY);
         public static final ConfigOptionList    DATAFIXER_MODE              = new ConfigOptionList("datafixerMode", DataFixerMode.ALWAYS).apply(GENERIC_KEY);
         public static final ConfigInteger       DATAFIXER_DEFAULT_SCHEMA    = new ConfigInteger("datafixerDefaultSchema", 1139, 99, 2724, true).apply(GENERIC_KEY);
@@ -75,7 +76,7 @@ public class Configs implements IConfigHandler
         public static final ConfigBoolean       ENABLE_DIFFERENT_BLOCKS     = new ConfigBoolean("enableDifferentBlocks", false).apply(GENERIC_KEY);
         public static final ConfigBooleanHotkeyed ENTITY_DATA_SYNC          = new ConfigBooleanHotkeyed("entityDataSync", false, "").apply(GENERIC_KEY);
         public static final ConfigBoolean       ENTITY_DATA_SYNC_BACKUP     = new ConfigBoolean("entityDataSyncBackup", false).apply(GENERIC_KEY);
-        public static final ConfigFloat         ENTITY_DATA_SYNC_CACHE_TIMEOUT= new ConfigFloat("entityDataSyncCacheTimeout", 0.75f, 0.25f, 30.0f).apply(GENERIC_KEY);
+        public static final ConfigFloat         ENTITY_DATA_SYNC_CACHE_TIMEOUT= new ConfigFloat("entityDataSyncCacheTimeout", 2.75f, 1.0f, 100.0f).apply(GENERIC_KEY);
         public static final ConfigBoolean       ENTITY_DATA_LOAD_NBT        = new ConfigBoolean("entityDataSyncLoadNbt", true).apply(GENERIC_KEY);
         public static final ConfigBoolean       EXECUTE_REQUIRE_TOOL        = new ConfigBoolean("executeRequireHoldingTool", true).apply(GENERIC_KEY);
         public static final ConfigBoolean       FIX_CHEST_MIRROR            = new ConfigBoolean("fixChestMirror", true).apply(GENERIC_KEY);
@@ -123,6 +124,7 @@ public class Configs implements IConfigHandler
                 COMMAND_DISABLE_FEEDBACK,
                 COMMAND_FILL_NO_CHUNK_CLAMP,
                 COMMAND_USE_WORLDEDIT,
+                COMMAND_USE_STRICT,
                 CUSTOM_SCHEMATIC_BASE_DIRECTORY_ENABLED,
                 DEBUG_HUD_MODE,
                 DEBUG_LOGGING,
@@ -215,6 +217,7 @@ public class Configs implements IConfigHandler
         public static final ConfigBoolean       ENABLE_SCHEMATIC_BLOCKS             = new ConfigBoolean("enableSchematicBlocksRendering",  true).apply(VISUALS_KEY);
         public static final ConfigBoolean       ENABLE_SCHEMATIC_FLUIDS             = new ConfigBoolean("enableSchematicFluidRendering", true).apply(VISUALS_KEY);
         public static final ConfigBoolean       ENABLE_SCHEMATIC_OVERLAY            = new ConfigBoolean("enableSchematicOverlay",  true).apply(VISUALS_KEY);
+        public static final ConfigBooleanHotkeyed ENABLE_SCHEMATIC_OVERLAY_CULLING  = new ConfigBooleanHotkeyed("enableSchematicOverlayCulling", true, "").apply(VISUALS_KEY);
         public static final ConfigBoolean       ENABLE_SCHEMATIC_RENDERING          = new ConfigBoolean("enableSchematicRendering", true).apply(VISUALS_KEY);
         public static final ConfigBoolean       ENABLE_SCHEMATIC_FAKE_LIGHTING      = new ConfigBoolean("enableSchematicFakeLighting", true).apply(VISUALS_KEY);
         //public static final ConfigInteger       RENDER_SCHEMATIC_MAX_THREADS        = new ConfigInteger("renderSchematicMaxThreads", 4, 1, 16).apply(VISUALS_KEY);
@@ -264,6 +267,7 @@ public class Configs implements IConfigHandler
                 ENABLE_SCHEMATIC_FLUIDS,
                 ENABLE_SCHEMATIC_FAKE_LIGHTING,
                 ENABLE_SCHEMATIC_OVERLAY,
+                ENABLE_SCHEMATIC_OVERLAY_CULLING,
                 IGNORE_EXISTING_FLUIDS,
                 IGNORE_EXISTING_BLOCKS,
                 IGNORABLE_EXISTING_BLOCKS,

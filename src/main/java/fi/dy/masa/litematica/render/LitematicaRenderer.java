@@ -16,8 +16,9 @@ import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
 
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
+
+import fi.dy.masa.malilib.compat.iris.IrisCompat;
 import fi.dy.masa.litematica.Reference;
-import fi.dy.masa.litematica.compat.iris.IrisCompat;
 import fi.dy.masa.litematica.config.Configs;
 import fi.dy.masa.litematica.config.Hotkeys;
 import fi.dy.masa.litematica.render.schematic.WorldRendererSchematic;
@@ -122,7 +123,7 @@ public class LitematicaRenderer
 		this.getWorldRenderer().updateCameraState(camera, tickProgress);
 	}
 
-    public void piecewisePrepareAndUpdate(Frustum frustum, Profiler profiler)
+    public void piecewisePrepare(Frustum frustum, Profiler profiler)
     {
 		// Configs.Generic.BETTER_RENDER_ORDER.getBooleanValue() &&
         boolean render = Configs.Visuals.ENABLE_RENDERING.getBooleanValue() &&
@@ -150,13 +151,28 @@ public class LitematicaRenderer
                 profiler.swap(Reference.MOD_ID+"_terrain_setup");
                 worldRenderer.setupTerrain(this.getCamera(), frustum, this.frameCount++, this.mc.player.isSpectator(), profiler);
 
-                profiler.swap(Reference.MOD_ID+"_update_chunks");
-                worldRenderer.updateChunks(this.finishTimeNano, profiler);
+//                profiler.swap(Reference.MOD_ID+"_update_chunks");
+//                worldRenderer.updateChunks(this.finishTimeNano, profiler);
 
                 profiler.pop();
 
                 this.frustum = frustum;
             }
+        }
+    }
+
+    public void piecewiseUpdate(Camera camera, Profiler profiler)
+    {
+        boolean render = Configs.Visuals.ENABLE_RENDERING.getBooleanValue() &&
+                camera != null;
+        WorldRendererSchematic worldRenderer = this.getWorldRenderer();
+
+        if (render && this.frustum != null && worldRenderer.hasWorld() &&
+            this.renderPiecewiseSchematic)
+        {
+            profiler.push(Reference.MOD_ID+"_update_chunks");
+            worldRenderer.updateChunks(this.finishTimeNano, profiler);
+            profiler.pop();
         }
     }
 
