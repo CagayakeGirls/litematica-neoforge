@@ -23,10 +23,12 @@ import net.minecraft.util.Uuids;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.math.random.Random;
 import net.minecraft.world.World;
 
 import fi.dy.masa.malilib.util.InventoryUtils;
+import fi.dy.masa.malilib.util.nbt.NbtKeys;
 import fi.dy.masa.litematica.Litematica;
 import fi.dy.masa.litematica.config.Configs;
 import fi.dy.masa.litematica.data.DataManager;
@@ -153,11 +155,13 @@ public class EntityUtils
     }
 
     private static boolean entityDebugRandom;
+    private static boolean entityDebugRandom2;
 
     public static void initEntityUtils()
     {
         Random rand = Random.create();
         entityDebugRandom = rand.nextBoolean();
+        entityDebugRandom2 = rand.nextBoolean();
     }
 
     public static Pair<String, String> getEntityDebug()
@@ -170,38 +174,66 @@ public class EntityUtils
 
         switch (name)
         {
+            case "sakuraryoko" ->
+            {
+                return Pair.of("Sakuramatica", "The Sakura Goddess Herself.");
+            }
             case "docm77" ->
             {
                 return Pair.of("Goatmatica", "Grind. Optimize. Automate. Thrive.");
             }
-            case "xisuma" ->
+            case "xisuma", "xisumavoid" ->
             {
-                return Pair.of("Xisumatica", "Check out Soulside Eclipse on Spotify.");
+                return entityDebugRandom2 ? Pair.of("Xisumatica", "Chief architect & humble leader.") : Pair.of("Xisumatica", "Check out Soulside Eclipse on Spotify.");
             }
-            case "rendog" ->
+            case "renthedog", "rendog" ->
             {
-                return Pair.of("Dogmatica", "Gigacorp's most famous employee.");
+                return entityDebugRandom2 ? Pair.of("Dogmatica", "Gigacorps' most famous employee.") : Pair.of("Renmatica", "Docm77's single ladies' favorite.");
             }
             case "geminitay" ->
             {
-                return Pair.of("Slaymatica", "Hermitcraft's chief remover of heads.");
+                return entityDebugRandom2 ? Pair.of("Slaymatica", "God's favorite Princess.") : Pair.of("Slaymatica", "Hermitcraft's chief remover of heads.");
             }
             case "pearlescentmoon" ->
             {
-                return Pair.of("Pearlmatica", "The queen of aussie ping.");
+                return entityDebugRandom2 ? Pair.of("Pearlmatica", "The queen of aussie ping.") : Pair.of("", "");
             }
             case "falsesymmetry" ->
             {
-                return Pair.of("Falsematica", "Promoter of Sand and Cactus sales.");
+                return entityDebugRandom2 ? Pair.of("Queenmatica", "The Queen of Hearts, Heads, and Body Parts.") : Pair.of("", "");
             }
-            case "tangotek" ->
+            case "tango" ->
             {
-                return Pair.of("Tangomatica", "The Dungeon Master.");
+                return entityDebugRandom2 ? Pair.of("Tangomatica", "The Dungeon Master.") : Pair.of("Tangomatica", "Master of the thingificator.");
             }
-            case "shubbleyt" ->
+            case "etho", "ethoslab" ->
             {
-                return Pair.of("Starmatica", "Red Mushroom blocks are soo underrated.");
+                return entityDebugRandom2 ? Pair.of("Slabmatica", "The Canadian legend.") : Pair.of("", "");
             }
+            case "ijevin" ->
+            {
+                return entityDebugRandom2 ? Pair.of("iJevinatica", "iJevin's favorite mod suite (thank you!)") : Pair.of("", "");
+            }
+            case "cubfan135" ->
+            {
+                return entityDebugRandom2 ? Pair.of("Cubmatica", "Ladies and gentlemen; Beautiful, absolutely beautiful.") : Pair.of("", "");
+            }
+	        case "smajor1995" ->
+	        {
+		        return entityDebugRandom2 ? Pair.of("Scottmatica", "The most friendly and soothing voice in the game.") : Pair.of("", "");
+	        }
+	        case "shubbleyt" ->
+	        {
+		        return entityDebugRandom2 ? Pair.of("Starmatica", "Red Mushroom blocks are soo underrated.") : Pair.of("", "");
+	        }
+	        case "goodtimewithscar" ->
+	        {
+		        return entityDebugRandom2 ? Pair.of("Scarmatica", "The Ore Snatcher.") : Pair.of("Scarmatica", "Architect of the whimsy.");
+	        }
+	        case "joehillssays", "joehillstsd" ->
+	        {
+		        return entityDebugRandom2 ? Pair.of("Joematica", "One of the True Hermits.") : Pair.of("Hillsmatica", "Howdy y'all from Nashville, TN!");
+	        }
             default ->
             {
                 return Pair.of("", "");
@@ -284,13 +316,16 @@ public class EntityUtils
         {
             for (Entity passenger : entity.getPassengerList())
             {
+                Vec3d adjPos = entity.getPassengerRidingPos(passenger);
+
                 passenger.refreshPositionAndAngles(
-                        entity.getX(),
-                        entity.getY() + entity.getPassengerRidingPos(passenger).getY(),
-                        entity.getZ(),
+                        adjPos.getX(),
+                        adjPos.getY(),
+                        adjPos.getZ(),
                         passenger.getYaw(), passenger.getPitch());
                 setEntityRotations(passenger, passenger.getYaw(), passenger.getPitch());
                 spawnEntityAndPassengersInWorld(passenger, world);
+                entity.updatePassengerPosition(passenger);
             }
         }
     }
@@ -453,5 +488,33 @@ public class EntityUtils
         }
 
         return hand;
+    }
+
+    public static NbtList updatePassengersToRelativeRegionPos(NbtList passengers, BlockPos relPos)
+    {
+        NbtList newList = new NbtList();
+
+        for (int i = 0; i < passengers.size(); i++)
+        {
+            NbtCompound entry = passengers.getCompoundOrEmpty(i);
+
+            if (!entry.isEmpty())
+            {
+                if (entry.contains(NbtKeys.POS))
+                {
+                    Vec3d pos = entry.get(NbtKeys.POS, Vec3d.CODEC).orElse(Vec3d.ZERO);
+                    Vec3d adjPos = new Vec3d(pos.getX() - relPos.getX(), pos.getY() - relPos.getY(), pos.getZ() - relPos.getZ());
+
+                    entry.put(NbtKeys.POS, Vec3d.CODEC, adjPos);
+                    newList.add(entry);
+                }
+                else
+                {
+                    newList.add(entry);
+                }
+            }
+        }
+
+        return newList;
     }
 }

@@ -15,6 +15,7 @@ import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.vertex.VertexFormat;
+import net.minecraft.block.Block;
 import net.minecraft.block.BlockRenderType;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.entity.BlockEntity;
@@ -30,7 +31,11 @@ import net.minecraft.client.render.model.BlockStateModel;
 import net.minecraft.client.texture.NativeImage;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.passive.*;
+import net.minecraft.fluid.Fluid;
 import net.minecraft.fluid.FluidState;
+import net.minecraft.fluid.Fluids;
+import net.minecraft.state.property.Property;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.crash.CrashException;
 import net.minecraft.util.crash.CrashReport;
@@ -51,6 +56,9 @@ import fi.dy.masa.litematica.Reference;
 import fi.dy.masa.litematica.config.Configs;
 import fi.dy.masa.litematica.config.Hotkeys;
 import fi.dy.masa.litematica.data.DataManager;
+import fi.dy.masa.litematica.mixin.entity.IMixinEntity;
+import fi.dy.masa.litematica.render.schematic.blocks.FallbackBlocks;
+import fi.dy.masa.litematica.util.IEntityInvoker;
 import fi.dy.masa.litematica.world.ChunkSchematic;
 import fi.dy.masa.litematica.world.WorldSchematic;
 
@@ -171,6 +179,40 @@ public class WorldRendererSchematic
     {
         return this.blockEntityRenderDispatcher;
     }
+
+	private <T extends Comparable<T>> BlockState getFallbackState(BlockState origState)
+	{
+		Collection<Property<?>> props = origState.getProperties();
+		Block block = origState.getBlock();
+
+		if (FallbackBlocks.BLOCK_TO_ID.containsKey(block))
+		{
+			Identifier id = FallbackBlocks.BLOCK_TO_ID.get(block);
+//			Litematica.LOGGER.warn("getFallbackState: Invalid Block State/Block Model for block [{}]; but we found a matching Litematica fallback block state that you can use.  Perhaps you have the Fusion mod installed?", origState.getBlock().getName().getString());
+			BlockState newState = FallbackBlocks.ID_TO_STATE_MANAGER.get(id).getDefaultState();
+
+			for (Property<?> entry : props)
+			{
+				@SuppressWarnings("unchecked")
+				Property<T> p = (Property<T>) entry;
+
+				if (newState.contains(p))
+				{
+					T value = origState.get(p);
+
+					if (!newState.get(p).equals(value))
+					{
+						newState = newState.with(p, value);
+					}
+				}
+			}
+
+//			Litematica.debugLog("Fallback Block State -- OLD: [{}] --> NEW: [{}]", origState.toString(), newState.toString());
+			return newState;
+		}
+
+		return origState;
+	}
 
     public void setWorldAndLoadRenderers(@Nullable WorldSchematic worldSchematic)
     {
@@ -1087,9 +1129,15 @@ public class WorldRendererSchematic
 
         if (parts.isEmpty())
         {
-            parts = this.getModelForState(state.getBlock().getDefaultState()).getParts(rand);
-            Litematica.LOGGER.warn("getModelParts: Invalid Block State for block at [{}] with state [{}]; Resetting to default.", pos.toShortString(), state.toString());
+			// Try Fallback Blocks first.
+	        parts = this.getModelForState(this.getFallbackState(state)).getParts(rand);
         }
+
+		if (parts.isEmpty())
+		{
+			parts = this.getModelForState(state.getBlock().getDefaultState()).getParts(rand);
+			Litematica.LOGGER.warn("getModelParts: Invalid Block Model for block at [{}] with state [{}]; Attempting to reset to default.", pos.toShortString(), state.toString());
+		}
 
         return parts;
     }
@@ -1166,6 +1214,23 @@ public class WorldRendererSchematic
 //                        Litematica.LOGGER.warn("[WorldRenderer] Chunk: [{}], EntityPos [{}] // Adj. Pos: X [{}], Y [{}], Z [{}]", pos.toShortString(), entityTmp.getBlockPos().toShortString(), x, y, z);
 
                         matrices.push();
+
+	                    // Check for Salmon / Cod 'inWater' fix
+	                    // Because the entities might be following the ClientWorld State
+	                    if (entityTmp instanceof SalmonEntity || entityTmp instanceof CodEntity ||
+		                    entityTmp instanceof TadpoleEntity || entityTmp instanceof AbstractHorseEntity ||
+		                    entityTmp instanceof TropicalFishEntity || entityTmp instanceof WaterAnimalEntity)
+	                    {
+		                    BlockState state = this.world.getBlockState(entityTmp.getBlockPos());
+		                    Fluid fluid = state.getFluidState() != null ? state.getFluidState().getFluid() : Fluids.EMPTY;
+
+		                    if ((fluid == Fluids.WATER || fluid == Fluids.FLOWING_WATER) &&
+			                    !((IMixinEntity) entityTmp).litematica_isTouchingWater())
+		                    {
+			                    ((IEntityInvoker) entityTmp).litematica$toggleTouchingWater(true);
+		                    }
+	                    }
+
                         this.entityRenderDispatcher.render(entityTmp, x, y, z, partialTicks, matrices, immediate, this.entityRenderDispatcher.getLight(entityTmp, partialTicks));
                         ++this.countEntitiesRendered;
                         matrices.pop();
