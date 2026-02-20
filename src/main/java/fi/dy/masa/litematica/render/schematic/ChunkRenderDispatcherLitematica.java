@@ -31,11 +31,12 @@ public class ChunkRenderDispatcherLitematica
     // Threaded Code
     //private static final ThreadFactory THREAD_FACTORY = (new ThreadFactoryBuilder()).setNameFormat("Litematica Chunk Batcher %d").setDaemon(true).build();
 
-    private final List<Thread> listWorkerThreads = new ArrayList<>();
-    private final List<ChunkRenderWorkerLitematica> listThreadedWorkers = new ArrayList<>();
-    private final PriorityBlockingQueue<ChunkRenderTaskSchematic> queueChunkUpdates = Queues.newPriorityBlockingQueue();
+    private final List<Thread> listWorkerThreads;
+    private final List<ChunkRenderWorkerLitematica> listThreadedWorkers;
+    private final PriorityBlockingQueue<ChunkRenderTaskSchematic> queueChunkUpdates;
     private final BlockingQueue<BufferAllocatorCache> queueFreeRenderAllocators;
-    private final Queue<ChunkRenderDispatcherLitematica.PendingUpload> queueChunkUploads = Queues.newPriorityQueue();
+    private final Queue<ChunkRenderDispatcherLitematica.PendingUpload> queueChunkUploads;
+//    final Queue<Runnable> queueChunkUploads = Queues.newConcurrentLinkedQueue();
     private final ChunkRenderWorkerLitematica renderWorker;
     private final int countRenderAllocators;
     // Threaded Code
@@ -44,6 +45,11 @@ public class ChunkRenderDispatcherLitematica
 
     public ChunkRenderDispatcherLitematica(Profiler profiler)
     {
+	    this.listWorkerThreads = new ArrayList<>();
+	    this.listThreadedWorkers = new ArrayList<>();
+		this.queueChunkUpdates = Queues.newPriorityBlockingQueue();
+		this.queueChunkUploads = Queues.newPriorityQueue();
+
         /* Threaded Code
 
         int threadLimitMemory = Math.max(1, (int) ((double) Runtime.getRuntime().maxMemory() * 0.3D) / BufferAllocatorCache.EXPECTED_TOTAL_SIZE);
@@ -295,6 +301,16 @@ public class ChunkRenderDispatcherLitematica
 
     public void freeRenderAllocators(BufferAllocatorCache allocatorCache)
     {
+        if (allocatorCache != null)
+        {
+            try
+            {
+                allocatorCache.close();
+            }
+            catch (Exception ignored) { }
+        }
+
+        allocatorCache = new BufferAllocatorCache();
         this.queueFreeRenderAllocators.add(allocatorCache);
     }
 
@@ -523,31 +539,31 @@ public class ChunkRenderDispatcherLitematica
 
         VertexBuffer vertexBuffer = renderChunk.getOverlayVertexBuffer(type);
 
-        if (type.isTranslucent() && Configs.Visuals.SCHEMATIC_OVERLAY_ENABLE_RESORTING.getBooleanValue())
-        {
-            BuiltBuffer.SortState sorting = compiledChunk.getTransparentSortingDataForOverlay(type);
-
-            if (sorting == null)
-            {
-                sorting = renderBuffer.sortQuads(allocator, sorter);
-
-                if (sorting == null)
-                {
-                    profiler.pop();
-                    throw new InterruptedException("Sort State failed to sortQuads()");
-                }
-
-                compiledChunk.setTransparentSortingDataForOverlay(type, sorting);
-            }
-
-            BufferAllocator.CloseableBuffer result = sorting.sortAndStore(allocator, sorter);
-
-            if (result != null)
-            {
-                renderChunk.uploadSortingState(result, vertexBuffer);
-                result.close();
-            }
-        }
+//        if (type.isTranslucent() && Configs.Visuals.SCHEMATIC_OVERLAY_ENABLE_RESORTING.getBooleanValue())
+//        {
+//            BuiltBuffer.SortState sorting = compiledChunk.getTransparentSortingDataForOverlay(type);
+//
+//            if (sorting == null)
+//            {
+//                sorting = renderBuffer.sortQuads(allocator, sorter);
+//
+//                if (sorting == null)
+//                {
+//                    profiler.pop();
+//                    throw new InterruptedException("Sort State failed to sortQuads()");
+//                }
+//
+//                compiledChunk.setTransparentSortingDataForOverlay(type, sorting);
+//            }
+//
+//            BufferAllocator.CloseableBuffer result = sorting.sortAndStore(allocator, sorter);
+//
+//            if (result != null)
+//            {
+//                renderChunk.uploadSortingState(result, vertexBuffer);
+//                result.close();
+//            }
+//        }
 
         if (resortOnly == false)
         {
