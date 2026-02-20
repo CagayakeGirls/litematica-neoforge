@@ -4,7 +4,7 @@ range-game = "[1.21.3,)"
 range-neoforge = "[21.3,)"
 range-mafglib = "[0.4,)"
 
-mod-link = "https://github.com/CagayakeGirls/malilib-neoforge"
+mod-link = "https://github.com/CagayakeGirls/litematica-neoforge"
 
 version-env = "client"
 version-type = "release"
