@@ -1,2 +1,2 @@
 ## Changelog
-- add mafglib dependency in `neoforge.mods.toml`
+- sync upstream `1.21.5-0.22.4`
