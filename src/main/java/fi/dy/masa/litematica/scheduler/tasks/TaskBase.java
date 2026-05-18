@@ -112,11 +112,11 @@ public abstract class TaskBase implements ITask, IInfoHudRenderer
     {
         if (radius <= 0)
         {
-            return WorldUtils.isClientChunkLoaded(world, pos.x, pos.z);
+            return WorldUtils.isClientChunkLoaded(world, pos.x(), pos.z());
         }
 
-        int chunkX = pos.x;
-        int chunkZ = pos.z;
+        int chunkX = pos.x();
+        int chunkZ = pos.z();
 
         for (int cx = chunkX - radius; cx <= chunkX + radius; ++cx)
         {
@@ -153,7 +153,7 @@ public abstract class TaskBase implements ITask, IInfoHudRenderer
             for (int i = 0; i < maxLines; ++i)
             {
                 ChunkPos pos = list.get(i);
-                this.infoHudLines.add(String.format("cx: %5d, cz: %5d (x: %d, z: %d)", pos.x, pos.z, pos.x << 4, pos.z << 4));
+                this.infoHudLines.add(String.format("cx: %5d, cz: %5d (x: %d, z: %d)", pos.x(), pos.z(), pos.x() << 4, pos.z() << 4));
             }
         }
     }

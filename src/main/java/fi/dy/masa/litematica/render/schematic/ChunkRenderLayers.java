@@ -28,7 +28,6 @@ public record ChunkRenderLayers()
         list.add(ChunkSectionLayer.SOLID);
         list.add(ChunkSectionLayer.CUTOUT);
         list.add(ChunkSectionLayer.TRANSLUCENT);
-        list.add(ChunkSectionLayer.TRIPWIRE);
 
         return list;
     }
@@ -37,10 +36,9 @@ public record ChunkRenderLayers()
     {
         HashMap<ChunkSectionLayer, Pair<RenderPipeline, RenderPipeline>> map = new HashMap<>();
 
-        map.put(ChunkSectionLayer.SOLID,         Pair.of(MaLiLibPipelines.LEGACY_SOLID_TERRAIN_MASA,       MaLiLibPipelines.LEGACY_SOLID_TERRAIN_MASA_OFFSET));
-        map.put(ChunkSectionLayer.CUTOUT,        Pair.of(MaLiLibPipelines.LEGACY_CUTOUT_TERRAIN_MASA,      MaLiLibPipelines.LEGACY_CUTOUT_TERRAIN_MASA_OFFSET));
-        map.put(ChunkSectionLayer.TRANSLUCENT,   Pair.of(MaLiLibPipelines.LEGACY_TRANSLUCENT_MASA,         MaLiLibPipelines.LEGACY_TRANSLUCENT_MASA_OFFSET));
-        map.put(ChunkSectionLayer.TRIPWIRE,      Pair.of(MaLiLibPipelines.LEGACY_TRIPWIRE_TERRAIN_MASA,    MaLiLibPipelines.LEGACY_TRIPWIRE_TERRAIN_MASA_OFFSET));
+        map.put(ChunkSectionLayer.SOLID,       Pair.of(MaLiLibPipelines.LEGACY_SOLID_TERRAIN,   MaLiLibPipelines.LEGACY_SOLID_TERRAIN_OFFSET));
+        map.put(ChunkSectionLayer.CUTOUT,      Pair.of(MaLiLibPipelines.LEGACY_CUTOUT_TERRAIN,  MaLiLibPipelines.LEGACY_CUTOUT_TERRAIN_OFFSET));
+        map.put(ChunkSectionLayer.TRANSLUCENT, Pair.of(MaLiLibPipelines.LEGACY_TRANSLUCENT,     MaLiLibPipelines.LEGACY_TRANSLUCENT_OFFSET));
 
         return map;
     }
@@ -53,7 +51,7 @@ public record ChunkRenderLayers()
 	    list.add(RenderTypes.solidMovingBlock());
 	    list.add(RenderTypes.cutoutMovingBlock());
 	    list.add(RenderTypes.translucentMovingBlock());
-	    list.add(RenderTypes.tripwireMovingBlock());
+	    // RenderTypes.tripwireMovingBlock() removed in 26.1.x
 	    list.add(RenderTypes.endPortal());
 	    list.add(RenderTypes.endGateway());
 

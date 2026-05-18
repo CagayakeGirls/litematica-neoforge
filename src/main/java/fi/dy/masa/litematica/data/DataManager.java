@@ -47,7 +47,8 @@ public class DataManager implements IDirectoryCache
     private static final ArrayList<ToBooleanFunction<Component>> CHAT_LISTENERS = new ArrayList<>();
     public static final Identifier CARPET_HELLO = Identifier.fromNamespaceAndPath("carpet", "hello");
 
-    private static ItemStack toolItem = new ItemStack(Items.STICK);
+    private static ItemStack toolItem = null;
+    private static String pendingToolItemName = null;
     private ItemStack toolItemComponents = null;
     private static ConfigGuiTab configGuiTab = ConfigGuiTab.GENERIC;
     private static boolean createPlacementOnLoad = true;
@@ -113,6 +114,21 @@ public class DataManager implements IDirectoryCache
 
     public static ItemStack getToolItem()
     {
+        if (toolItem == null)
+        {
+            String name = pendingToolItemName;
+            pendingToolItemName = null;
+
+            if (name != null)
+            {
+                toolItem = InventoryUtils.getItemStackFromString(name);
+            }
+            if (toolItem == null)
+            {
+                toolItem = new ItemStack(Items.STICK);
+                Configs.Generic.TOOL_ITEM.setValueFromString(BuiltInRegistries.ITEM.getKey(Items.STICK).toString());
+            }
+        }
         return toolItem;
     }
 
@@ -647,14 +663,10 @@ public class DataManager implements IDirectoryCache
      */
     public static void setToolItem(String itemNameIn)
     {
-        toolItem = InventoryUtils.getItemStackFromString(itemNameIn);
-
-        if (toolItem == null)
-        {
-            // Fall back to a stick
-            toolItem = new ItemStack(Items.STICK);
-            Configs.Generic.TOOL_ITEM.setValueFromString(BuiltInRegistries.ITEM.getKey(Items.STICK).toString());
-        }
+        // Defer ItemStack creation until registries have their components bound.
+        // getToolItem() will resolve it lazily on first access.
+        pendingToolItemName = itemNameIn;
+        toolItem = null;
     }
 
     /**

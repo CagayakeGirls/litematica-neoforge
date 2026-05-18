@@ -1,8 +1,8 @@
 [versions]
 range-fml = "[4,)"
-range-game = "[1.21.11,)"
-range-neoforge = "[21.11,)"
-range-mafglib = "[0.4,)"
+range-game = "[26.1.2,)"
+range-neoforge = "[26.1,)"
+range-mafglib = "[0.5,)"
 
 mod-link = "https://github.com/CagayakeGirls/litematica-neoforge"
 
@@ -14,9 +14,9 @@ platformId-modrinth = "dCKRaeBC"
 
 yarn-patch = "1.21+build.6"
 
-architectury-loom = "1.13-SNAPSHOT"
+architectury-loom = "1.14.473"
 modpublisher = "2.+"
 
 [plugins]
-architectury-loom = { id = "dev.architectury.loom", version.ref = "architectury-loom" }
+architectury-loom = { id = "dev.architectury.loom-no-remap", version.ref = "architectury-loom" }
 modpublisher = { id = "com.hypherionmc.modutils.modpublisher", version.ref = "modpublisher" }

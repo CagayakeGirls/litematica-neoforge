@@ -2,7 +2,7 @@ package fi.dy.masa.litematica.render.schematic.ao;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.world.level.BlockAndTintGetter;
+import net.minecraft.client.renderer.block.BlockAndTintGetter;
 import net.minecraft.world.level.block.state.BlockState;
 
 /**
@@ -68,7 +68,7 @@ public class AOProcessorLegacy extends AOProcessor
 			this.fs[vertexTranslations.vert3] = b4;
 		}
 
-		float b = world.getShade(face, hasShade);
+		float b = hasShade ? world.cardinalLighting().byFace(face) : 1.0F;
 
 		for (int index = 0; index < this.fs.length; ++index)
 		{

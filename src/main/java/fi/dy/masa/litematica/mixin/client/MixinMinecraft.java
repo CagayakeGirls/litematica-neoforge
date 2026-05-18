@@ -15,7 +15,7 @@ public abstract class MixinMinecraft extends ReentrantBlockableEventLoop<Runnabl
 {
     public MixinMinecraft(String string_1)
     {
-        super(string_1);
+        super(string_1, false);
     }
 
     @Inject(method = "tick()V", at = @At("HEAD"))

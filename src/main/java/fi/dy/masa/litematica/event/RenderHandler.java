@@ -1,12 +1,16 @@
 package fi.dy.masa.litematica.event;
 
 import java.util.function.Supplier;
-import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderBuffers;
 import net.minecraft.client.renderer.culling.Frustum;
+import net.minecraft.client.renderer.state.level.CameraRenderState;
 import net.minecraft.util.profiling.ProfilerFiller;
 import org.joml.Matrix4f;
+import org.joml.Matrix4fc;
+import org.joml.Vector4f;
+import com.mojang.blaze3d.buffers.GpuBufferSlice;
+import com.mojang.blaze3d.pipeline.RenderTarget;
 import fi.dy.masa.malilib.interfaces.IRenderer;
 import fi.dy.masa.malilib.render.GuiContext;
 import fi.dy.masa.malilib.util.GuiUtils;
@@ -34,30 +38,32 @@ public class RenderHandler implements IRenderer
 //    }
 
     @Override
-    public void onRenderWorldLastAdvanced(RenderTarget fb, Matrix4f posMatrix, Matrix4f projMatrix, Frustum frustum, Camera camera, RenderBuffers buffers, ProfilerFiller profiler)
+    public void onRenderWorldLast(RenderTarget fb, Matrix4fc posMatrix, CameraRenderState cameraRenderState, Frustum frustum, RenderBuffers buffers, GpuBufferSlice slice, Vector4f vec4f, ProfilerFiller profiler)
     {
         Minecraft mc = Minecraft.getInstance();
 
         if (Configs.Visuals.ENABLE_RENDERING.getBooleanValue() && mc.player != null)
         {
+            Matrix4f pos = (Matrix4f) posMatrix;
+            Matrix4f proj = cameraRenderState.projectionMatrix;
             profiler.push("overlay_boxes");
-            OverlayRenderer.getInstance().renderBoxes(posMatrix, projMatrix, profiler);
+            OverlayRenderer.getInstance().renderBoxes(pos, proj, profiler);
 
             if (Configs.InfoOverlays.VERIFIER_OVERLAY_ENABLED.getBooleanValue())
             {
                 profiler.popPush("overlay_mismatches");
-                OverlayRenderer.getInstance().renderSchematicVerifierMismatches(posMatrix, projMatrix, profiler);
+                OverlayRenderer.getInstance().renderSchematicVerifierMismatches(pos, proj, profiler);
             }
 
             if (DataManager.getToolMode() == ToolMode.REBUILD)
             {
                 profiler.popPush("overlay_targeting");
-                OverlayRenderer.getInstance().renderSchematicRebuildTargetingOverlay(posMatrix, projMatrix, profiler);
+                OverlayRenderer.getInstance().renderSchematicRebuildTargetingOverlay(pos, proj, profiler);
             }
 
             // Schematic Overlay Rendering
             profiler.popPush("schematic_overlay");
-            LitematicaRenderer.getInstance().piecewiseRenderOverlay(posMatrix, projMatrix, profiler);
+            LitematicaRenderer.getInstance().piecewiseRenderOverlay(pos, proj, profiler);
             profiler.pop();
         }
     }
@@ -69,7 +75,7 @@ public class RenderHandler implements IRenderer
     }
 
     @Override
-    public void onRenderGameOverlayPostAdvanced(GuiContext ctx, float partialTicks, ProfilerFiller profiler)
+    public void onExtractGuiOverlayPost(GuiContext ctx, float partialTicks, ProfilerFiller profiler)
     {
         if (Configs.Visuals.ENABLE_RENDERING.getBooleanValue() && ctx.mc().player != null)
         {

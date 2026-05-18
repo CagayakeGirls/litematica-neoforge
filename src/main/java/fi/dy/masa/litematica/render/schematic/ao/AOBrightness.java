@@ -5,7 +5,7 @@ import it.unimi.dsi.fastutil.longs.Long2IntLinkedOpenHashMap;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.Util;
-import net.minecraft.world.level.BlockAndTintGetter;
+import net.minecraft.client.renderer.block.BlockAndTintGetter;
 import net.minecraft.world.level.block.state.BlockState;
 
 import fi.dy.masa.litematica.render.IWorldSchematicRenderer;

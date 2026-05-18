@@ -161,7 +161,7 @@ public class OverlayRenderer
                     if (currentSelection.isOriginSelected())
                     {
                         Color4f colorTmp = Color4f.fromColor(this.colorAreaOrigin, 0.4f);
-                        fi.dy.masa.malilib.render.RenderUtils.renderAreaSides(origin, origin, colorTmp, posMatrix);
+                        fi.dy.masa.malilib.render.RenderUtils.renderAreaSides(origin, origin, colorTmp);
                     }
 
                     profiler.popPush("block_outlines");
@@ -211,7 +211,7 @@ public class OverlayRenderer
                             {
                                 float alpha = (float) Configs.Visuals.PLACEMENT_BOX_SIDE_ALPHA.getDoubleValue();
                                 color = new Color4f(color.r, color.g, color.b, alpha);
-                                fi.dy.masa.malilib.render.RenderUtils.renderAreaSides(box.getPos1(), box.getPos2(), color, posMatrix);
+                                fi.dy.masa.malilib.render.RenderUtils.renderAreaSides(box.getPos1(), box.getPos2(), color);
                             }
                         }
                     }
@@ -316,18 +316,18 @@ public class OverlayRenderer
                      ((boxType == BoxType.PLACEMENT_SELECTED || boxType == BoxType.PLACEMENT_UNSELECTED) &&
                        Configs.Visuals.RENDER_PLACEMENT_BOX_SIDES.getBooleanValue()))
                 {
-                    fi.dy.masa.malilib.render.RenderUtils.renderAreaSides(pos1, pos2, sideColor, matrix4f);
+                    fi.dy.masa.malilib.render.RenderUtils.renderAreaSides(pos1, pos2, sideColor);
                 }
 
                 if (box.getSelectedCorner() == Corner.CORNER_1)
                 {
                     Color4f color = Color4f.fromColor(this.colorPos1, 0.4f);
-                    fi.dy.masa.malilib.render.RenderUtils.renderAreaSides(pos1, pos1, color, matrix4f);
+                    fi.dy.masa.malilib.render.RenderUtils.renderAreaSides(pos1, pos1, color);
                 }
                 else if (box.getSelectedCorner() == Corner.CORNER_2)
                 {
                     Color4f color = Color4f.fromColor(this.colorPos2, 0.4f);
-                    fi.dy.masa.malilib.render.RenderUtils.renderAreaSides(pos2, pos2, color, matrix4f);
+                    fi.dy.masa.malilib.render.RenderUtils.renderAreaSides(pos2, pos2, color);
                 }
 
                 fi.dy.masa.malilib.render.RenderUtils.renderBlockOutline(pos1, expand, lineWidthBlockBox, color1, false);
@@ -335,7 +335,7 @@ public class OverlayRenderer
             }
             else
             {
-                fi.dy.masa.malilib.render.RenderUtils.renderBlockOutlineOverlapping(pos1, expand, lineWidthBlockBox, color1, color2, this.colorOverlapping, matrix4f, false);
+                fi.dy.masa.malilib.render.RenderUtils.renderBlockOutlineOverlapping(pos1, expand, lineWidthBlockBox, color1, color2, this.colorOverlapping, false);
             }
         }
         else
@@ -787,12 +787,12 @@ public class OverlayRenderer
             if (direction)
             {
                 fi.dy.masa.malilib.render.RenderUtils.renderBlockTargetingOverlay(
-                        entity, pos, trace.getDirection(), trace.getLocation(), color, posMatrix);
+                        entity, pos, trace.getDirection(), trace.getLocation(), color);
             }
             else
             {
                 fi.dy.masa.malilib.render.RenderUtils.renderBlockTargetingOverlaySimple(
-                        entity, pos, trace.getDirection(), color, posMatrix);
+                        entity, pos, trace.getDirection(), color);
             }
         }
 

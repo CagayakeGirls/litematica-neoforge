@@ -2,7 +2,7 @@ package fi.dy.masa.litematica.render.schematic.ao;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.world.level.BlockAndTintGetter;
+import net.minecraft.client.renderer.block.BlockAndTintGetter;
 import net.minecraft.world.level.block.state.BlockState;
 
 /**
@@ -37,13 +37,13 @@ public class AOProcessorModern extends AOProcessor
         int l = this.brightnessCache.getInt(bs4, world, mutable);
         float m = this.brightnessCache.getFloat(bs4, world, mutable);
         BlockState bs5 = world.getBlockState(mutable.setWithOffset(blockPos, nd.corners[0]).move(face));
-        boolean bl2 = !bs5.isViewBlocking(world, mutable) || bs5.getLightBlock() == 0;
+        boolean bl2 = !bs5.isViewBlocking(world, mutable) || bs5.getLightDampening() == 0;
         BlockState bs6 = world.getBlockState(mutable.setWithOffset(blockPos, nd.corners[1]).move(face));
-        boolean bl3 = !bs6.isViewBlocking(world, mutable) || bs6.getLightBlock() == 0;
+        boolean bl3 = !bs6.isViewBlocking(world, mutable) || bs6.getLightDampening() == 0;
         BlockState bs7 = world.getBlockState(mutable.setWithOffset(blockPos, nd.corners[2]).move(face));
-        boolean bl4 = !bs7.isViewBlocking(world, mutable) || bs7.getLightBlock() == 0;
+        boolean bl4 = !bs7.isViewBlocking(world, mutable) || bs7.getLightDampening() == 0;
         BlockState bs8 = world.getBlockState(mutable.setWithOffset(blockPos, nd.corners[3]).move(face));
-        boolean bl5 = !bs8.isViewBlocking(world, mutable) || bs8.getLightBlock() == 0;
+        boolean bl5 = !bs8.isViewBlocking(world, mutable) || bs8.getLightDampening() == 0;
 
         float n;
         int o;
@@ -173,7 +173,7 @@ public class AOProcessorModern extends AOProcessor
             this.fs[translation.vert3] = aa;
         }
 
-	    float x = world.getShade(face, hasShade);
+	    float x = hasShade ? world.cardinalLighting().byFace(face) : 1.0F;
 
         for (int av = 0; av < this.fs.length; av++)
         {

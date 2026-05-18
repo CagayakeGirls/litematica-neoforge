@@ -57,7 +57,7 @@ public record ChunkRenderBatchDraw(
 
 			pass.setUniform("ChunkFix", this.chunkFixUBO);
 			pass.bindTexture("Sampler2",
-			                 mc.gameRenderer.lightTexture().getTextureView(),
+			                 mc.gameRenderer.lightmap(),
 			                 RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR)
 			);
 

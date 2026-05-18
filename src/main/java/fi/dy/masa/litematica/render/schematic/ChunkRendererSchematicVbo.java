@@ -16,8 +16,7 @@ import com.mojang.blaze3d.vertex.*;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.client.renderer.ItemBlockRenderTypes;
-import net.minecraft.client.renderer.block.model.BlockModelPart;
+import net.minecraft.client.renderer.block.dispatch.BlockStateModelPart;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
 import net.minecraft.client.renderer.blockentity.state.BlockEntityRenderState;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
@@ -555,9 +554,9 @@ public class ChunkRendererSchematicVbo implements AutoCloseable
         this.getProfiler().pop();
         this.profiler = null;
 
-        if (this.worldRenderer.getChunkSchematicState(this.chunkPosition.x, this.chunkPosition.z).atLeast(ChunkSchematicState.RENDERED))
+        if (this.worldRenderer.getChunkSchematicState(this.chunkPosition.x(), this.chunkPosition.z()).atLeast(ChunkSchematicState.RENDERED))
         {
-            this.worldRenderer.setChunkSchematicState(this.chunkPosition.x, this.chunkPosition.z, ChunkSchematicState.RENDERED);
+            this.worldRenderer.setChunkSchematicState(this.chunkPosition.x(), this.chunkPosition.z(), ChunkSchematicState.RENDERED);
         }
 
         data.setTimeBuilt(this.world.getGameTime());
@@ -683,7 +682,7 @@ public class ChunkRendererSchematicVbo implements AutoCloseable
                 Configs.Visuals.ENABLE_SCHEMATIC_FLUIDS.getBooleanValue())
             {
                 this.getProfiler().popPush("render_build_fluids");
-                ChunkSectionLayer layer = ItemBlockRenderTypes.getRenderLayer(fluidState);
+                ChunkSectionLayer layer = Minecraft.getInstance().getModelManager().getFluidStateModelSet().get(fluidState).layer();
                 int offsetY = ((pos.getY() >> 4) << 4) - this.position.getY();
                 BufferBuilder bufferSchematic = this.builderCache.getBufferByBlockLayer(layer, allocators);
 
@@ -703,7 +702,22 @@ public class ChunkRendererSchematicVbo implements AutoCloseable
             if (stateSchematic.getRenderShape() != RenderShape.INVISIBLE)
             {
                 this.getProfiler().popPush("render_build_blocks");
-                ChunkSectionLayer layer = translucent ? ChunkSectionLayer.TRANSLUCENT : ItemBlockRenderTypes.getChunkRenderType(stateSchematic);
+                ChunkSectionLayer layer;
+                if (translucent)
+                {
+                    layer = ChunkSectionLayer.TRANSLUCENT;
+                }
+                else
+                {
+                    List<BlockStateModelPart> parts = this.worldRenderer.getModelParts(pos, stateSchematic, this.rand);
+                    layer = ChunkSectionLayer.SOLID;
+                    if (!parts.isEmpty())
+                    {
+                        var quads = parts.getFirst().getQuads(null);
+                        if (quads.isEmpty()) quads = parts.getFirst().getQuads(Direction.UP);
+                        if (!quads.isEmpty()) layer = quads.getFirst().materialInfo().layer();
+                    }
+                }
                 BufferBuilder bufferSchematic = this.builderCache.getBufferByBlockLayer(layer, allocators);
 
                 if (!data.isBlockLayerStarted(layer) || bufferSchematic == null)
@@ -810,7 +824,7 @@ public class ChunkRendererSchematicVbo implements AutoCloseable
             {
                 this.getProfiler().popPush("cull_inner_sides");
                 BlockPos.MutableBlockPos posMutable = new BlockPos.MutableBlockPos();
-                List<BlockModelPart> modelParts = this.worldRenderer.getModelParts(relPos, stateSchematic, this.rand);
+                List<BlockStateModelPart> modelParts = this.worldRenderer.getModelParts(relPos, stateSchematic, this.rand);
 
                 if (RenderUtils.hasQuads(modelParts))
                 {
@@ -837,7 +851,7 @@ public class ChunkRendererSchematicVbo implements AutoCloseable
                             {
                                 this.getProfiler().popPush("cull_render_model");
 
-                                for (BlockModelPart part : modelParts)
+                                for (BlockStateModelPart part : modelParts)
                                 {
 //                                final int light = WorldRenderer.getLightmapCoordinates(this.schematicWorldView, relPos);
 //                                    LOGGER.warn("renderOverlay: Batched Block Model Side Quads [{}] -->", side.asString());
@@ -863,7 +877,7 @@ public class ChunkRendererSchematicVbo implements AutoCloseable
                 if (missing && Configs.Visuals.SCHEMATIC_OVERLAY_MODEL_SIDES.getBooleanValue())
                 {
                     this.getProfiler().popPush("render_model_sides");
-                    List<BlockModelPart> modelParts = this.worldRenderer.getModelParts(relPos, stateSchematic, this.rand);
+                    List<BlockStateModelPart> modelParts = this.worldRenderer.getModelParts(relPos, stateSchematic, this.rand);
 
                     if (RenderUtils.hasQuads(modelParts))
                     {
@@ -968,7 +982,7 @@ public class ChunkRendererSchematicVbo implements AutoCloseable
                          */
 
                         this.getProfiler().popPush("render_model_batched");
-                        List<BlockModelPart> modelParts = this.worldRenderer.getModelParts(relPos, stateSchematic, this.rand);
+                        List<BlockStateModelPart> modelParts = this.worldRenderer.getModelParts(relPos, stateSchematic, this.rand);
 
                         if (RenderUtils.hasQuads(modelParts))
                         {
@@ -992,7 +1006,7 @@ public class ChunkRendererSchematicVbo implements AutoCloseable
                 if (missing && Configs.Visuals.SCHEMATIC_OVERLAY_MODEL_OUTLINE.getBooleanValue())
                 {
                     this.getProfiler().popPush("render_model_batched");
-                    List<BlockModelPart> modelParts = this.worldRenderer.getModelParts(relPos, stateSchematic, this.rand);
+                    List<BlockStateModelPart> modelParts = this.worldRenderer.getModelParts(relPos, stateSchematic, this.rand);
 
                     if (RenderUtils.hasQuads(modelParts))
                     {

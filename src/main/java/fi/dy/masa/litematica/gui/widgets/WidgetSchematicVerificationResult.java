@@ -567,9 +567,9 @@ public class WidgetSchematicVerificationResult extends WidgetListEntrySortable<B
 //
 ////            DiffuseLighting.enableGuiDepthLighting();
 //
-//        List<BlockModelPart> parts = model.getParts(RAND);
+//        List<BlockStateModelPart> parts = model.getParts(RAND);
 //
-//        for (BlockModelPart part : parts)
+//        for (BlockStateModelPart part : parts)
 //        {
 //            for (Direction face : PositionUtils.ALL_DIRECTIONS)
 //            {

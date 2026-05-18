@@ -27,10 +27,11 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.ClientMannequin;
 import net.minecraft.client.renderer.DynamicUniforms;
 import net.minecraft.client.renderer.SubmitNodeCollector;
-import net.minecraft.client.renderer.block.BlockRenderDispatcher;
-import net.minecraft.client.renderer.block.model.BakedQuad;
-import net.minecraft.client.renderer.block.model.BlockModelPart;
-import net.minecraft.client.renderer.block.model.BlockStateModel;
+import net.minecraft.client.renderer.block.FluidRenderer;
+import net.minecraft.client.renderer.block.dispatch.BlockStateModelDispatcher;
+import net.minecraft.client.resources.model.geometry.BakedQuad;
+import net.minecraft.client.renderer.block.dispatch.BlockStateModelPart;
+import net.minecraft.client.renderer.block.dispatch.BlockStateModel;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderDispatcher;
 import net.minecraft.client.renderer.blockentity.state.BlockEntityRenderState;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
@@ -39,7 +40,7 @@ import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
 import net.minecraft.client.renderer.entity.state.EntityRenderState;
 import net.minecraft.client.renderer.fog.FogRenderer;
-import net.minecraft.client.renderer.state.LevelRenderState;
+import net.minecraft.client.renderer.state.level.LevelRenderState;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.core.BlockPos;
@@ -57,7 +58,7 @@ import net.minecraft.world.entity.animal.fish.Cod;
 import net.minecraft.world.entity.animal.fish.Salmon;
 import net.minecraft.world.entity.animal.fish.TropicalFish;
 import net.minecraft.world.entity.animal.frog.Tadpole;
-import net.minecraft.world.level.BlockAndTintGetter;
+import net.minecraft.client.renderer.block.BlockAndTintGetter;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.RenderShape;
@@ -96,7 +97,7 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
     private final Minecraft mc;
     private final EntityRenderDispatcher entityRenderManager;
     private final BlockEntityRenderDispatcher blockEntityRenderManager;
-    private BlockRenderDispatcher blockRenderManager;
+    // blockRenderManager removed in 26.1.x — use mc.getModelManager() directly
     private final BlockModelRendererSchematic blockModelRenderer;
     private final Set<BlockEntity> blockEntities;
     private final List<ChunkRendererSchematicVbo> renderInfos;
@@ -139,13 +140,12 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
     {
         this.mc = mc;
         this.renderChunkFactory = ChunkRendererSchematicVbo::new;
-        this.blockRenderManager = Minecraft.getInstance().getBlockRenderer();
 	    this.blockEntities = new HashSet<>();
 	    this.renderInfos = new ArrayList<>(1024);
         this.renderedEntities = new HashMap<>();
         this.entityRenderManager = mc.getEntityRenderDispatcher();
         this.blockEntityRenderManager = mc.getBlockEntityRenderDispatcher();
-        this.blockModelRenderer = new BlockModelRendererSchematic(mc.getBlockColors(), this.blockRenderManager);
+        this.blockModelRenderer = new BlockModelRendererSchematic(mc.getBlockColors());
         this.blockModelRenderer.setBakedManager(mc.getModelManager());
         this.fogRenderer = ((IMixinGameRenderer) mc.gameRenderer).litematica_getFogRenderer();
 		this.schematicRenderState = new SchematicRenderState();
@@ -459,7 +459,7 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
         final int centerChunkX = (viewPos.getX() >> 4);
         final int centerChunkZ = (viewPos.getZ() >> 4);
         final int renderDistance = this.mc.options.renderDistance().get() + 2;
-        ChunkPos viewChunk = new ChunkPos(viewPos);
+        ChunkPos viewChunk = ChunkPos.containing(viewPos);
 
         this.displayListEntitiesDirty = this.displayListEntitiesDirty || !this.chunksToUpdate.isEmpty() ||
                 entityX != this.lastCameraX ||
@@ -500,8 +500,8 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
             for (ChunkPos chunkPos : positions)
             {
                 //SubChunkPos subChunk = queuePositions.poll();
-                int cx = chunkPos.x;
-                int cz = chunkPos.z;
+                int cx = chunkPos.x();
+                int cz = chunkPos.z();
                 //LOGGER.warn("[WorldRenderer] setupTerrain() position[{}], chunkPos: {} // isLoaded: [{}]", count, chunkPos.toString(), this.world.getChunkProvider().hasChunk(chunkPos.x, chunkPos.z));
                 // Only render sub-chunks that are within the client's render distance, and that
                 // have been already properly loaded on the client
@@ -747,12 +747,13 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
                     ));
 
                     renderMap.get(layer)
-                             .add(new RenderPass.Draw<>(
+                             .add(new RenderPass.Draw<GpuBufferSlice[]>(
                                      0, buffers.getVertexBuffer(),
                                      vertexBuffer, indexType,
                                      0, buffers.getIndexCount(),
+                                     0,
                                      (slices, uploader) ->
-                                             uploader.upload("DynamicTransforms", ((GpuBufferSlice[]) slices)[pos])
+                                             uploader.upload("DynamicTransforms", slices[pos])
                              ));
 
 //                    int pos = chunkValues.size();
@@ -873,7 +874,7 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
 		this.schematicRenderState.cameraState.initialized = camera.isInitialized();
 		this.schematicRenderState.cameraState.pos = camera.position();
 		this.schematicRenderState.cameraState.blockPos = camera.blockPosition();
-		this.schematicRenderState.cameraState.entityPos = camera.entity().getRopeHoldPosition(tickProgress);
+		// entityPos removed from CameraRenderState in 26.1.x
 		this.schematicRenderState.cameraState.orientation = new Quaternionf(camera.rotation());
 	}
 
@@ -1005,7 +1006,7 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
                 boolean result;
 
                 this.blockModelRenderer.setSeed(state.getSeed(pos));
-                List<BlockModelPart> parts = this.getModelParts(pos, state, this.blockModelRenderer.getRandom());
+                List<BlockStateModelPart> parts = this.getModelParts(pos, state, this.blockModelRenderer.getRandom());
 
                 result = renderType == RenderShape.MODEL &&
                         this.blockModelRenderer.renderModel(world, parts, state, pos, matrixStack, bufferBuilderIn, false, OverlayTexture.NO_OVERLAY);
@@ -1038,10 +1039,10 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
     public void renderFluid(BlockAndTintGetter world, BlockState blockState, FluidState fluidState, BlockPos pos, BufferBuilder bufferBuilderIn)
     {
         this.getProfiler().push("render_fluid");
-        // Sometimes this collides with FAPI
         try
         {
-            this.blockRenderManager.renderLiquid(pos, world, bufferBuilderIn, blockState, fluidState);
+            new FluidRenderer(this.mc.getModelManager().getFluidStateModelSet())
+                .tesselate(world, pos, layer -> bufferBuilderIn, blockState, fluidState);
         }
         catch (Exception ignored) { }
         this.getProfiler().pop();
@@ -1121,9 +1122,9 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
     }
 
     @Override
-    public boolean hasQuadsForModel(List<BlockModelPart> modelParts, BlockState state, @Nullable Direction side)
+    public boolean hasQuadsForModel(List<BlockStateModelPart> modelParts, BlockState state, @Nullable Direction side)
     {
-        BlockModelPart part = modelParts.getFirst();
+        BlockStateModelPart part = modelParts.getFirst();
 
         if (side != null)
         {
@@ -1146,7 +1147,7 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
     }
 
     @Override
-    public boolean hasQuadsForModelPart(BlockModelPart modelPart, BlockState state, @Nullable Direction side)
+    public boolean hasQuadsForModelPart(BlockStateModelPart modelPart, BlockState state, @Nullable Direction side)
     {
         if (side != null)
         {
@@ -1171,23 +1172,24 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
     @Override
     public BlockStateModel getModelForState(BlockState state)
     {
-        return this.blockRenderManager.getBlockModelShaper().getBlockModel(state);
+        return this.mc.getModelManager().getBlockStateModelSet().get(state);
     }
 
     @Override
-    public List<BlockModelPart> getModelParts(BlockPos pos, BlockState state, RandomSource rand)
+    public List<BlockStateModelPart> getModelParts(BlockPos pos, BlockState state, RandomSource rand)
     {
-        List<BlockModelPart> parts = this.getModelForState(state).collectParts(rand);
+        List<BlockStateModelPart> parts = new java.util.ArrayList<>();
+        this.getModelForState(state).collectParts(rand, parts);
 
         if (parts.isEmpty())
         {
 			// Try Fallback Blocks first.
-	        parts = this.getModelForState(this.getFallbackState(state)).collectParts(rand);
+	        this.getModelForState(this.getFallbackState(state)).collectParts(rand, parts);
         }
 
 		if (parts.isEmpty())
 		{
-			parts = this.getModelForState(state.getBlock().defaultBlockState()).collectParts(rand);
+			this.getModelForState(state.getBlock().defaultBlockState()).collectParts(rand, parts);
 			LOGGER.warn("getModelParts: Invalid Block Model for block at [{}] with state [{}]; Attempting to reset to default.", pos.toShortString(), state.toString());
 		}
 
@@ -1229,10 +1231,10 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
                 BlockPos pos = chunkRenderer.getOrigin();
                 ChunkPos chunkPos = chunkRenderer.getChunkPos();
 //                ChunkPos chunkPos = new ChunkPos(pos.getX() >> 4, pos.getZ() >> 4);
-                ChunkSchematic chunk = this.world.getChunkSource().getChunkIfExists(chunkPos.x, chunkPos.z);
+                ChunkSchematic chunk = this.world.getChunkSource().getChunkIfExists(chunkPos.x(), chunkPos.z());
 
                 if (chunk == null || chunk.isEmpty() ||
-                    !DataManager.getSchematicPlacementManager().checkIfChunkShouldRender(chunkPos.x, chunkPos.z))
+                    !DataManager.getSchematicPlacementManager().checkIfChunkShouldRender(chunkPos.x(), chunkPos.z()))
                 {
                     continue;
                 }
@@ -1240,7 +1242,7 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
 //                List<Entity> list = chunk.getEntityList();
 //                AABB bb = chunkRenderer.getBoundingBox();
 //                List<Entity> list = this.world.getEntities((Entity) null, bb, fi.dy.masa.litematica.util.EntityUtils.NOT_PLAYER);
-                ImmutableList<Entity> list = this.world.getEntitiesByChunk(chunkPos.x, chunkPos.z, fi.dy.masa.litematica.util.EntityUtils.NOT_PLAYER);
+                ImmutableList<Entity> list = this.world.getEntitiesByChunk(chunkPos.x(), chunkPos.z(), fi.dy.masa.litematica.util.EntityUtils.NOT_PLAYER);
 
 //                LOGGER.error("[WorldRenderer] prepareEntities: Chunk: {}, EntityList [{}] // BB: [{}]", chunkPos.toString(), list.size(), bb.toString());
 //                LOGGER.warn("[WorldRenderer] prepareEntities: Chunk: [{}], TestList: [{}]", pos.toShortString(), list.size());
@@ -1363,7 +1365,7 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
         double cameraY = camera.position().y;
         double cameraZ = camera.position().z;
 
-        this.blockEntityRenderManager.prepare(camera);
+        this.blockEntityRenderManager.prepare(camera.position());
         LayerRange layerRange = DataManager.getRenderLayerRange();
 
 		profiler.popPush("block_entities");
@@ -1380,10 +1382,10 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
             {
                 BlockPos chunkOrigin = chunkRenderer.getOrigin();
                 ChunkPos chunkPos = chunkRenderer.getChunkPos();
-                ChunkSchematic chunk = this.world.getChunkSource().getChunkForLighting(chunkPos.x, chunkPos.z);
+                ChunkSchematic chunk = this.world.getChunkSource().getChunkForLighting(chunkPos.x(), chunkPos.z());
 
                 if (chunk == null || chunk.isEmpty() ||
-                    !DataManager.getSchematicPlacementManager().checkIfChunkShouldRender(chunkPos.x, chunkPos.z))
+                    !DataManager.getSchematicPlacementManager().checkIfChunkShouldRender(chunkPos.x(), chunkPos.z()))
                 {
                     continue;
                 }
@@ -1527,9 +1529,8 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
     }
 
     @Override
-    public void reloadBlockRenderManager(BlockRenderDispatcher manager)
+    public void reloadBlockRenderManager(BlockStateModelDispatcher manager)
 	{
-		this.blockRenderManager = manager;
-		this.blockModelRenderer.reload(manager);
+        this.blockModelRenderer.reload(manager);
 	}
 }
