@@ -5,8 +5,8 @@ import io.netty.buffer.Unpooled;
 import org.apache.commons.lang3.tuple.Pair;
 import org.jspecify.annotations.NonNull;
 
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+//import net.fabricmc.api.EnvType;
+//import net.fabricmc.api.Environment;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
@@ -26,7 +26,7 @@ import fi.dy.masa.litematica.data.EntitiesDataStorage;
 import fi.dy.masa.litematica.schematic.LitematicaSchematic;
 import fi.dy.masa.litematica.schematic.placement.SchematicPlacement;
 
-@Environment(EnvType.CLIENT)
+//@Environment(EnvType.CLIENT)
 public abstract class ServuxLitematicaHandler<T extends CustomPacketPayload> implements IPluginClientPlayHandler<T>
 {
     private final static ServuxLitematicaHandler<ServuxLitematicaPacket.Payload> INSTANCE = new ServuxLitematicaHandler<>()
