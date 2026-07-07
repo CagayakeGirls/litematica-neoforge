@@ -43,5 +43,9 @@ public final class CagayakeGirlsGradlePlugin implements Plugin<PluginAware> {
             repo.setName("KTTMavenReleases");
             repo.setUrl("https://maven.kessokuteatime.work/releases/");
         });
+        repositories.maven(repo -> {
+            repo.setName("Sinytra");
+            repo.setUrl("https://maven.su5ed.dev/releases/");
+        });
     }
 }
