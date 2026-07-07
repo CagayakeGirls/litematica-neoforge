@@ -33,9 +33,7 @@ import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.phys.Vec3;
 
 import fi.dy.masa.malilib.render.uniform.ChunkFixUniform;
-import fi.dy.masa.litematica.render.schematic.BlockModelRendererSchematic;
-import fi.dy.masa.litematica.render.schematic.IBlockOutputSchematic;
-import fi.dy.masa.litematica.render.schematic.SchematicRenderState;
+import fi.dy.masa.litematica.render.schematic.*;
 import fi.dy.masa.litematica.util.IEntityHitboxDebugRendererInvoker;
 import fi.dy.masa.litematica.world.ChunkSchematicState;
 import fi.dy.masa.litematica.world.WorldSchematic;
@@ -64,11 +62,9 @@ public interface IWorldSchematicRenderer
 
 	ProfilerFiller getProfiler();
 
-//	BlockModelRendererSchematic getBlockRenderer();
+	ChunkRenderGpuDispatcher getChunkRendererGpuDispatcher();
 
 	BlockEntityRenderDispatcher getBlockEntityRenderer();
-
-	FluidRenderer getFluidRenderer();
 
 	EntityRenderDispatcher getEntityRenderer();
 
@@ -102,7 +98,7 @@ public interface IWorldSchematicRenderer
 
 	boolean renderBlock(BlockModelRendererSchematic renderer, BlockAndTintGetter world, BlockState state, BlockPos pos, Vec3 offset, IBlockOutputSchematic output);
 
-	boolean renderFluid(BlockAndTintGetter world, BlockState blockState, FluidState fluidState, BlockPos pos, FluidRenderer.Output output, final float offsetY);
+	boolean renderFluid(FluidModelRendererSchematic renderer, BlockAndTintGetter world, BlockState blockState, FluidState fluidState, BlockPos pos, FluidRenderer.Output output, final float offsetY);
 
 	void drawBlockLayerGroup(ChunkSectionLayerGroup group, @Nullable GpuSampler sampler);
 
@@ -128,6 +124,8 @@ public interface IWorldSchematicRenderer
 
 	ChunkFixUniform getChunkFixUniform();
 
+//	LegacyTerrainFixUniform getLegacyTerrainFixUniform();
+
 	void setGpuSampler(@Nonnull GpuSampler gpuSampler);
 
 	GpuSampler getGpuSampler();
@@ -135,6 +133,8 @@ public interface IWorldSchematicRenderer
 	void closeGpuSampler();
 
 	void clearChunkFixUniform();
+
+//	void clearLegacyTerrainFixUniform();
 
 	void clearWorldRenderStates();
 

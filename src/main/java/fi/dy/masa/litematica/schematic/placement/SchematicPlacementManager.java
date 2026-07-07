@@ -40,7 +40,7 @@ import fi.dy.masa.litematica.command.PmCommand;
 import fi.dy.masa.litematica.config.Configs;
 import fi.dy.masa.litematica.config.Hotkeys;
 import fi.dy.masa.litematica.data.DataManager;
-import fi.dy.masa.litematica.data.EntitiesDataStorage;
+import fi.dy.masa.litematica.data.EntityDataManager;
 import fi.dy.masa.litematica.data.SchematicHolder;
 import fi.dy.masa.litematica.network.ServuxLitematicaHandler;
 import fi.dy.masa.litematica.network.ServuxLitematicaPacket;
@@ -1118,7 +1118,7 @@ public class SchematicPlacementManager
                 }
                 else if (mc.hasSingleplayerServer() == false || Configs.Generic.PASTE_USING_COMMANDS_IN_SP.getBooleanValue())
                 {
-                    if (EntitiesDataStorage.getInstance().hasServuxServer() &&
+                    if (EntityDataManager.getInstance().hasServuxServer() &&
                         Configs.Generic.PASTE_USING_SERVUX.getBooleanValue())
                     {
                         Litematica.debugLog("Found a Servux server, I am sending the Schematic Placement to it.");
@@ -1130,8 +1130,9 @@ public class SchematicPlacementManager
 //                        if (Configs.Generic.PASTE_SERVUX_EXPERIMENTAL.getBooleanValue())
                         if (nbt.sizeInBytes() > maxSize)
                         {
-                            Litematica.LOGGER.warn("[Servux Paste]: Slicing Oversided Schematic for Servux Paste ...");
-                            this.sliceForServux(schematicPlacement.getSchematic(), nbt, maxSize, printMessage);
+//                            Litematica.LOGGER.warn("[Servux Paste]: Slicing Oversided Schematic for Servux Paste ...");
+//                            this.sliceForServux(schematicPlacement.getSchematic(), nbt, maxSize, printMessage);
+                            InfoUtils.showGuiOrInGameMessage(MessageType.ERROR, "litematica.message.error.placement_paste_too_large_for_servux");
                         }
                         else
                         {
@@ -1173,12 +1174,12 @@ public class SchematicPlacementManager
     }
 
     // Attempt to slice the schematic if oversized, and transmit it as a file.
-    private void sliceForServux(LitematicaSchematic litematic, CompoundTag nbt, final int maxSize, boolean printMessage)
-    {
-        final long sessionKey = RandomSource.create(Util.getMillis()).nextLong();
-        nbt.remove("Schematics");
-        litematic.sendTransmitFile(nbt, sessionKey, printMessage);
-    }
+//    private void sliceForServux(LitematicaSchematic litematic, CompoundTag nbt, final int maxSize, boolean printMessage)
+//    {
+//        final long sessionKey = RandomSource.create(Util.getMillis()).nextLong();
+//        nbt.remove("Schematics");
+//        litematic.sendTransmitFile(nbt, sessionKey, printMessage);
+//    }
 
     public void clear()
     {

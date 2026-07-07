@@ -13,8 +13,9 @@ import fi.dy.masa.litematica.compat.jade.JadeCompat;
 import fi.dy.masa.litematica.config.Configs;
 import fi.dy.masa.litematica.data.CachedTagManager;
 import fi.dy.masa.litematica.data.DataManager;
-import fi.dy.masa.litematica.data.EntitiesDataStorage;
+import fi.dy.masa.litematica.data.EntityDataManager;
 import fi.dy.masa.litematica.render.LitematicaDebugHud;
+import fi.dy.masa.litematica.render.LitematicaRenderer;
 import fi.dy.masa.litematica.schematic.conversion.SchematicConversionMaps;
 import fi.dy.masa.litematica.schematic.placement.TemporaryWorldManager;
 import fi.dy.masa.litematica.world.SchematicWorldHandler;
@@ -39,7 +40,7 @@ public class WorldLoadListener implements IWorldLoadListener
         if (worldAfter != null)
         {
             JadeCompat.checkForJade();
-            EntitiesDataStorage.getInstance().onWorldPre();
+            EntityDataManager.getInstance().onWorldPre();
             DataManager.getInstance().onWorldPre(worldAfter.registryAccess());
         }
     }
@@ -49,7 +50,7 @@ public class WorldLoadListener implements IWorldLoadListener
     {
         SchematicWorldHandler.INSTANCE.recreateSchematicWorld(worldAfter == null);
         DataManager.getInstance().reset(worldAfter == null);
-        EntitiesDataStorage.getInstance().reset(worldAfter == null);
+        EntityDataManager.getInstance().reset(worldAfter == null);
         TemporaryWorldManager.INSTANCE.reset();
 
         if (worldAfter != null)
@@ -58,10 +59,11 @@ public class WorldLoadListener implements IWorldLoadListener
             SchematicConversionMaps.computeMaps();
             Configs.checkBaseLanguage();
             DataManager.load();
-            EntitiesDataStorage.getInstance().onWorldJoin();
+            EntityDataManager.getInstance().onWorldJoin();
             CachedTagManager.startCache();
 	        LitematicaDebugHud.INSTANCE.checkConfig();
             DataManager.getSchematicPlacementManager().onWorldJoin();
+            LitematicaRenderer.getInstance().updateConfigState();
         }
         else
         {
