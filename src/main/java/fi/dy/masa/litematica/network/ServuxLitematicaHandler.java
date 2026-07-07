@@ -1,6 +1,9 @@
 package fi.dy.masa.litematica.network;
 
+import javax.annotation.Nullable;
 import io.netty.buffer.Unpooled;
+import org.apache.commons.lang3.tuple.Pair;
+
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayNetworkHandler;
 import net.minecraft.nbt.NbtCompound;
@@ -81,10 +84,26 @@ public abstract class ServuxLitematicaHandler<T extends CustomPayload> implement
                     this.servuxRegistered = true;
                 }
             }
-            case PACKET_S2C_BLOCK_NBT_RESPONSE_SIMPLE -> EntitiesDataStorage.getInstance().handleBlockEntityData(packet.getPos(), packet.getCompound(), null);
-            case PACKET_S2C_ENTITY_NBT_RESPONSE_SIMPLE -> EntitiesDataStorage.getInstance().handleEntityData(packet.getEntityId(), packet.getCompound());
+            case PACKET_S2C_BLOCK_NBT_RESPONSE_SIMPLE ->
+                    {
+                        if (this.servuxRegistered)
+                        {
+                            EntitiesDataStorage.getInstance().handleBlockEntityData(packet.getPos(), packet.getCompound(), null);
+                        }
+                    }
+            case PACKET_S2C_ENTITY_NBT_RESPONSE_SIMPLE ->
+                    {
+                        if (this.servuxRegistered)
+                        {
+                            EntitiesDataStorage.getInstance().handleEntityData(packet.getEntityId(), packet.getCompound());
+                        }
+                    }
             case PACKET_S2C_NBT_RESPONSE_DATA ->
             {
+                if (!this.servuxRegistered)
+                {
+                    return;
+                }
                 if (this.readingSessionKey == -1)
                 {
                     this.readingSessionKey = Random.create(Util.getMeasuringTimeMs()).nextLong();
@@ -98,7 +117,7 @@ public abstract class ServuxLitematicaHandler<T extends CustomPayload> implement
                     try
                     {
                         this.readingSessionKey = -1;
-                        EntitiesDataStorage.getInstance().handleBulkEntityData(fullPacket.readVarInt(), (NbtCompound) fullPacket.readNbt(NbtSizeTracker.ofUnlimitedBytes()));
+                        this.handleBulkData(fullPacket.readVarInt(), (NbtCompound) fullPacket.readNbt(NbtSizeTracker.ofUnlimitedBytes()));
                     }
                     catch (Exception e)
                     {
@@ -108,6 +127,42 @@ public abstract class ServuxLitematicaHandler<T extends CustomPayload> implement
             }
             default -> Litematica.LOGGER.warn("ServuxLitematicaHandler#decodeClientData(): received unhandled packetType {} of size {} bytes.", packet.getPacketType(), packet.getTotalSize());
         }
+    }
+
+    private void handleBulkData(final int type, @Nullable NbtCompound nbt)
+    {
+        if (nbt == null || nbt.isEmpty())
+        {
+            return;
+        }
+
+        String task = nbt.getString("Task");
+        Litematica.debugLog("handleBulkData: received task: {}", task);
+
+        // For future Granular Task Management
+//        switch (task)
+//        {
+//            // File-Transmit support
+//            case "Litematic-TransmitStart", "Litematic-TransmitCancel", "Litematic-TransmitData", "Litematic-TransmitEnd" ->
+//            {
+//                Pair<LitematicaSchematic, CompoundTag> schemPair = LitematicaSchematic.receiveFileTransmit(nbt);
+//
+//                if (schemPair != null && schemPair.getLeft().getFile() != null)
+//                {
+//                    Litematica.LOGGER.info("handleBulkData(): Received litematic '{}' from the server", schemPair.getLeft().getFile().toAbsolutePath().toString());
+//
+//                    SchematicPlacement placement = SchematicPlacement.createFromNbt(schemPair.getLeft(), schemPair.getRight());
+//
+//                    if (placement != null)
+//                    {
+//                        DataManager.getSchematicPlacementManager().addSchematicPlacement(placement, true);
+//                    }
+//                }
+//            }
+//            default -> EntityDataManager.getInstance().handleBulkEntityData(type, DataConverterNbt.fromVanillaCompound(nbt));
+//        }
+
+        EntitiesDataStorage.getInstance().handleBulkEntityData(type, nbt);
     }
 
     @Override

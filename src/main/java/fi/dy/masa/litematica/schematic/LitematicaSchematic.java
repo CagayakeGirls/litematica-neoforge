@@ -2,6 +2,8 @@ package fi.dy.masa.litematica.schematic;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
@@ -11,6 +13,8 @@ import javax.annotation.Nullable;
 import com.google.common.collect.ImmutableMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import org.apache.commons.lang3.tuple.Pair;
+import org.jetbrains.annotations.ApiStatus;
+import org.jetbrains.annotations.VisibleForTesting;
 
 import net.minecraft.SharedConstants;
 import net.minecraft.block.Block;
@@ -47,8 +51,11 @@ import fi.dy.masa.malilib.util.data.Constants;
 import fi.dy.masa.malilib.util.nbt.NbtUtils;
 import fi.dy.masa.litematica.Litematica;
 import fi.dy.masa.litematica.config.Configs;
+import fi.dy.masa.litematica.data.DataManager;
 import fi.dy.masa.litematica.data.EntitiesDataStorage;
 import fi.dy.masa.litematica.mixin.world.IMixinWorldTickScheduler;
+import fi.dy.masa.litematica.network.ServuxLitematicaHandler;
+import fi.dy.masa.litematica.network.ServuxLitematicaPacket;
 import fi.dy.masa.litematica.schematic.container.ILitematicaBlockStatePalette;
 import fi.dy.masa.litematica.schematic.container.LitematicaBlockStateContainer;
 import fi.dy.masa.litematica.schematic.conversion.SchematicConversionFixers;
@@ -57,6 +64,8 @@ import fi.dy.masa.litematica.schematic.conversion.SchematicConverter;
 import fi.dy.masa.litematica.schematic.conversion.SchematicDowngradeConverter;
 import fi.dy.masa.litematica.schematic.placement.SchematicPlacement;
 import fi.dy.masa.litematica.schematic.placement.SubRegionPlacement;
+import fi.dy.masa.litematica.schematic.transmit.SchematicBuffer;
+import fi.dy.masa.litematica.schematic.transmit.SchematicBufferManager;
 import fi.dy.masa.litematica.selection.AreaSelection;
 import fi.dy.masa.litematica.selection.Box;
 import fi.dy.masa.litematica.util.BlockUtils;
@@ -91,6 +100,14 @@ public class LitematicaSchematic
     @Nullable private final File schematicFile;
     private final FileType schematicType;
 
+    public LitematicaSchematic(Path file, NbtCompound nbt, FileType type)
+    {
+        this.readFromNBT(nbt);
+        this.schematicFile = file.toFile();
+        this.schematicType = type;
+        this.converter = SchematicConverter.createForLitematica();
+    }
+
     private LitematicaSchematic(@Nullable File file)
     {
         this(file, FileType.LITEMATICA_SCHEMATIC);
@@ -99,6 +116,13 @@ public class LitematicaSchematic
     private LitematicaSchematic(@Nullable File file, FileType schematicType)
     {
         this.schematicFile = file;
+        this.schematicType = schematicType;
+        this.converter = SchematicConverter.createForLitematica();
+    }
+
+    private LitematicaSchematic(@Nullable Path file, FileType schematicType)
+    {
+        this.schematicFile = file.toFile();
         this.schematicType = schematicType;
         this.converter = SchematicConverter.createForLitematica();
     }
@@ -285,7 +309,7 @@ public class LitematicaSchematic
      */
     public static LitematicaSchematic createEmptySchematicFromExisting(@Nonnull LitematicaSchematic existing, String newAuthor)
     {
-        LitematicaSchematic newSchematic = new LitematicaSchematic(null, existing.schematicType);
+        LitematicaSchematic newSchematic = new LitematicaSchematic((File) null, existing.schematicType);
 
         if (newAuthor.isEmpty() == false)
         {
@@ -1233,6 +1257,183 @@ public class LitematicaSchematic
         return tagList;
     }
 
+    @Deprecated(forRemoval = true)
+    @ApiStatus.Experimental
+    public void sendTransmitFile(NbtCompound nbtIn, final long sessionKey, boolean printMessage)
+    {
+        if (EntitiesDataStorage.getInstance().hasServuxServer() == false)
+        {
+            if (printMessage)
+            {
+                InfoUtils.showGuiOrInGameMessage(MessageType.ERROR, "litematica.message.error.schematic_transmit_not_available");
+            }
+
+            Litematica.LOGGER.error("transmitFileToServux: Cannot transmit a Litematic without having Servux present.");
+            return;
+        }
+
+        if (printMessage)
+        {
+            InfoUtils.showGuiOrInGameMessage(MessageType.INFO, "litematica.message.schematic_transmit_start");
+        }
+
+        Path file = this.getFile().toPath();
+        NbtCompound output = new NbtCompound();
+        final int bufferSize = SchematicBuffer.BUFFER_SIZE;
+        long totalBytes;
+        int totalSlices;
+
+        try
+        {
+            totalBytes = Files.size(file);
+            totalSlices = (int) ((totalBytes + bufferSize - 1) / bufferSize);
+        }
+        catch (IOException e)
+        {
+            Litematica.LOGGER.error("sendTransmitFile: Unable to read file size; {}", e.getLocalizedMessage());
+            return;
+        }
+
+        output.putString("Task", "Litematic-TransmitStart");
+        //output.put("FileType", FileType.CODEC, this.schematicType);
+        output.put("FileType", FileType.CODEC.encodeStart(NbtOps.INSTANCE, this.schematicType).getOrThrow());
+        output.putLong("SliceKey", sessionKey);
+        output.putInt("TotalSlices", totalSlices);
+        output.putLong("TotalSize", totalBytes);
+
+        if (!nbtIn.isEmpty())
+        {
+            output.put("PlacementData", nbtIn);
+        }
+
+        ServuxLitematicaHandler.getInstance().encodeClientData(ServuxLitematicaPacket.ResponseC2SStart(output));
+
+        // File Stream
+        output.putLong("SliceKey", sessionKey);
+        byte[] buffer = new byte[bufferSize];
+        int currentSlice = 0;
+
+        try (InputStream is = Files.newInputStream(file))
+        {
+            int bytesRead = 0;
+            output.putString("Task", "Litematic-TransmitData");
+
+            while ((bytesRead = is.read(buffer, 0, bufferSize)) != -1)
+            {
+                output.remove("Slice");
+                output.remove("Size");
+                output.remove("Data");
+                output.putInt("Slice", totalSlices);
+                output.putInt("Size", bytesRead);
+
+                byte[] correctedData = new byte[bytesRead];
+                System.arraycopy(buffer, 0, correctedData, 0, bytesRead);
+                output.putByteArray("Data", correctedData);
+                ServuxLitematicaHandler.getInstance().encodeClientData(ServuxLitematicaPacket.ResponseC2SStart(output));
+                currentSlice++;
+            }
+        }
+        catch (Exception err)
+        {
+            if (printMessage)
+            {
+                InfoUtils.showGuiOrInGameMessage(MessageType.ERROR, "litematica.message.error.schematic_transmit_fail");
+            }
+
+            output = new NbtCompound();
+            output.putLong("SliceKey", sessionKey);
+            output.putString("Task", "Litematic-TransmitCancel");
+            ServuxLitematicaHandler.getInstance().encodeClientData(ServuxLitematicaPacket.ResponseC2SStart(output));
+            Litematica.LOGGER.error("sliceForServux: Exception reading file; {}", err.getLocalizedMessage());
+            return;
+        }
+
+        // End Slice
+        output.remove("Slice");
+        output.remove("Size");
+        output.remove("Data");
+
+        output.putString("Task", "Litematic-TransmitEnd");
+        ServuxLitematicaHandler.getInstance().encodeClientData(ServuxLitematicaPacket.ResponseC2SStart(output));
+        Litematica.debugLog("receiveFileTransmit: Treansmitted file '{}', [tS: {}, tB: {}]", file.toAbsolutePath().toString(), totalSlices, totalBytes);
+
+        if (printMessage)
+        {
+            InfoUtils.showGuiOrInGameMessage(MessageType.INFO, "litematica.message.schematic_transmit_complete", totalBytes);
+        }
+    }
+
+    @Deprecated(forRemoval = true)
+    @ApiStatus.Experimental
+    public static @Nullable Pair<LitematicaSchematic, NbtCompound> receiveFileTransmit(NbtCompound nbt)
+    {
+        SchematicBufferManager manager = DataManager.getSchematicBufferManager();
+        String task = nbt.getString("Task");
+        final long key = nbt.getLong("SliceKey");
+
+        if (task.isEmpty() || key == -1L)
+        {
+            Litematica.LOGGER.error("receiveFileTransmit: Invalid sessionKey or Task received.");
+            return null;
+        }
+
+        switch (task)
+        {
+            case "Litematic-TransmitStart" ->
+            {
+                //FileType type = nbt.get("FileType", FileType.CODEC).orElse(FileType.LITEMATICA_SCHEMATIC);
+                FileType type = FileType.CODEC.parse(NbtOps.INSTANCE, nbt.get("FileType")).getPartialOrThrow();
+                final int totalSlices = nbt.getInt("TotalSlices");
+                final long totalSize = nbt.getLong("TotalSize");
+
+                manager.createBuffer(totalSlices, totalSize, type, key, nbt.getCompound("PlacementData"));
+            }
+            case "Litematic-TransmitData" ->
+            {
+                final int slice = nbt.getInt("Slice");
+                final int size = nbt.getInt("Size");
+                final byte[] data = nbt.getByteArray("Data");
+
+                if (slice < 0 || size < 0 || data.length == 0)
+                {
+                    Litematica.LOGGER.error("receiveFileTransmit: Invalid Slice Data received for session key [{}]", key);
+                    return null;
+                }
+
+                manager.receiveSlice(key, slice, data, size);
+            }
+            case "Litematic-TransmitCancel" ->
+            {
+                Litematica.LOGGER.warn("receiveFileTransmit: Cancel received for session key [{}]", key);
+                manager.cancelBuffer(key);
+            }
+            case "Litematic-TransmitEnd" ->
+            {
+                final int totalSlices = nbt.getInt("TotalSlices");
+                final long totalSize = nbt.getLong("TotalSize");
+                Path dir = DataManager.getSchematicTransmitDirectory();
+                NbtCompound optional = manager.getOptionalNbt(key);
+                LitematicaSchematic schematic = manager.finishBuffer(key, dir);
+
+                if (schematic == null)
+                {
+                    Litematica.LOGGER.warn("receiveFileTransmit: Failed to create Schematic for finishing session key [{}]", key);
+                    return null;
+                }
+
+                // Successful transmission
+                Litematica.LOGGER.warn("receiveFileTransmit: Received file '{}', [tS: {}, tB: {}]", schematic.getFile().getAbsoluteFile().toString(), totalSlices, totalSize);
+                return Pair.of(schematic, optional);
+            }
+            default ->
+            {
+                Litematica.LOGGER.error("receiveFileTransmit: Invalid sessionKey or Task received.");
+            }
+        }
+
+        return null;
+    }
+
     private boolean readFromNBT(NbtCompound nbt)
     {
         this.blockContainers.clear();
@@ -1447,7 +1648,7 @@ public class LitematicaSchematic
         return new Vec3i(tag.getInt("Width"), tag.getInt("Height"), tag.getInt("Length"));
     }
 
-    protected boolean readSpongePaletteFromTag(NbtCompound tag, ILitematicaBlockStatePalette palette)
+    protected boolean readSpongePaletteFromTag(NbtCompound tag, ILitematicaBlockStatePalette palette, int minecraftDataVersion)
     {
         final int size = tag.getKeys().size();
         List<BlockState> list = new ArrayList<>(size);
@@ -1461,7 +1662,7 @@ public class LitematicaSchematic
         for (String key : tag.getKeys())
         {
             int id = tag.getInt(key);
-            Optional<BlockState> stateOptional = BlockUtils.getBlockStateFromString(key);
+            Optional<BlockState> stateOptional = BlockUtils.getBlockStateFromString(key, minecraftDataVersion);
             BlockState state;
 
             if (stateOptional.isPresent())
@@ -1575,7 +1776,7 @@ public class LitematicaSchematic
 
         this.blockContainers.put(schematicName, container);
 
-        if (this.readSpongePaletteFromTag(paletteTag, container.getPalette()) == false)
+        if (this.readSpongePaletteFromTag(paletteTag, container.getPalette(), minecraftDataVersion) == false)
         {
             return false;
         }
@@ -1880,6 +2081,7 @@ public class LitematicaSchematic
                 NbtCompound t = paletteTag.getCompound(id);
                 if (minecraftDataVersion < LitematicaSchematic.MINECRAFT_DATA_VERSION && effective != null)
                 {
+					// Also updates Block Names
                     t = SchematicConversionMaps.updateBlockStates(t, minecraftDataVersion);
                 }
                 BlockState state = NbtHelper.toBlockState(lookup, t);
@@ -2817,6 +3019,15 @@ public class LitematicaSchematic
     public static LitematicaSchematic createFromFile(File dir, String fileName, FileType schematicType)
     {
         File file = fileFromDirAndName(dir, fileName, schematicType);
+        LitematicaSchematic schematic = new LitematicaSchematic(file, schematicType);
+
+        return schematic.readFromFile(schematicType) ? schematic : null;
+    }
+
+    @Nullable
+    public static LitematicaSchematic createFromFile(Path dir, String fileName, FileType schematicType)
+    {
+        Path file = fileFromDirAndName(dir, fileName, schematicType);
         LitematicaSchematic schematic = new LitematicaSchematic(file, schematicType);
 
         return schematic.readFromFile(schematicType) ? schematic : null;
