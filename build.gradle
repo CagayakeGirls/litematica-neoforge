@@ -1,5 +1,5 @@
 plugins {
-	id 'fabric-loom' version '1.15-SNAPSHOT'
+	id 'fabric-loom' version '1.16-SNAPSHOT'
 	id 'maven-publish'
 }
 
@@ -17,7 +17,7 @@ repositories {
 		content { includeGroupAndSubgroups("com.github")}
 	}
 //	maven { url = 'https://api.modrinth.com/maven' }
-//	mavenLocal()
+	mavenLocal()
 }
 
 dependencies {

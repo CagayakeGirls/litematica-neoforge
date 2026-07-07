@@ -1,6 +1,5 @@
 package fi.dy.masa.litematica.render;
 
-import java.util.Collection;
 import java.util.List;
 import org.joml.Matrix4fc;
 import org.jspecify.annotations.Nullable;
@@ -20,20 +19,24 @@ import net.minecraft.client.renderer.blockentity.BlockEntityRenderDispatcher;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayerGroup;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
+import net.minecraft.client.renderer.fog.FogRenderer;
 import net.minecraft.client.renderer.state.LevelRenderState;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.util.Brightness;
 import net.minecraft.util.RandomSource;
+import net.minecraft.util.debug.DebugValueAccess;
 import net.minecraft.util.profiling.ProfilerFiller;
 import net.minecraft.world.level.BlockAndTintGetter;
 import net.minecraft.world.level.LightLayer;
-import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.phys.Vec3;
 
 import fi.dy.masa.malilib.render.uniform.ChunkFixUniform;
+import fi.dy.masa.litematica.render.schematic.ChunkRenderGpuDispatcher;
+import fi.dy.masa.litematica.render.schematic.SchematicRenderState;
+import fi.dy.masa.litematica.util.IEntityHitboxDebugRendererInvoker;
 import fi.dy.masa.litematica.world.ChunkSchematicState;
 import fi.dy.masa.litematica.world.WorldSchematic;
 
@@ -61,17 +64,21 @@ public interface IWorldSchematicRenderer
 
 	ProfilerFiller getProfiler();
 
+	ChunkRenderGpuDispatcher getChunkRendererGpuDispatcher();
+
 	EntityRenderDispatcher getEntityRenderer();
 
 	BlockEntityRenderDispatcher getBlockEntityRenderer();
+
+	FogRenderer getFogRenderer();
+
+	SchematicRenderState getSchematicRenderState();
 
 	void setWorldAndLoadRenderers(@Nullable WorldSchematic world);
 
 	void loadRenderers(@Nullable ProfilerFiller profiler);
 
 	void reloadBlockRenderManager(BlockRenderDispatcher dispatcher);
-
-	ChunkFixUniform getChunkFixUniform();
 
 	void updateCameraState(Camera camera, float tickProgress);
 
@@ -109,7 +116,7 @@ public interface IWorldSchematicRenderer
 
 	void renderBlockEntities(Camera camera, Frustum frustum, PoseStack matrices, LevelRenderState renderStates, SubmitNodeCollector queue, ProfilerFiller profiler);
 
-	void updateBlockEntities(Collection<BlockEntity> toRemove, Collection<BlockEntity> toAdd);
+//	void updateBlockEntities(Collection<BlockEntity> toRemove, Collection<BlockEntity> toAdd);
 
 	void renderBlockOverlays(Camera camera, float lineWidth, ProfilerFiller profiler);
 
@@ -119,11 +126,17 @@ public interface IWorldSchematicRenderer
 
 	void setChunkSchematicState(int chunkX, int chunkZ, ChunkSchematicState state);
 
-	void clearBlockBatchDraw();
+	ChunkFixUniform getChunkFixUniform();
+
+	//	LegacyTerrainFixUniform getLegacyTerrainFixUniform();
 
 	void clearChunkFixUniform();
 
+	//	void clearLegacyTerrainFixUniform();
+
 	void clearWorldRenderStates();
+
+	void renderEntityDebugHitboxes(IEntityHitboxDebugRendererInvoker invoker, double cameraX, double cameraY, double cameraZ, DebugValueAccess debugValueAccess, Frustum frustum, float ticks);
 
 	static int getLightmap(BlockAndTintGetter world, BlockPos pos)
 	{

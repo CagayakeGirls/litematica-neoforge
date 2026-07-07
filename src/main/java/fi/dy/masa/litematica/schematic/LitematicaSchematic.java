@@ -1,5 +1,6 @@
 package fi.dy.masa.litematica.schematic;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -10,6 +11,8 @@ import javax.annotation.Nullable;
 import com.google.common.collect.ImmutableMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import org.apache.commons.lang3.tuple.Pair;
+import org.jetbrains.annotations.ApiStatus;
+import org.jetbrains.annotations.VisibleForTesting;
 
 import net.minecraft.SharedConstants;
 import net.minecraft.client.Minecraft;
@@ -27,6 +30,7 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.Container;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.boss.enderdragon.EnderDragonPart;
 import net.minecraft.world.entity.decoration.BlockAttachedEntity;
 import net.minecraft.world.entity.decoration.HangingEntity;
 import net.minecraft.world.level.ChunkPos;
@@ -52,7 +56,7 @@ import fi.dy.masa.malilib.util.nbt.NbtView;
 import fi.dy.masa.litematica.Litematica;
 import fi.dy.masa.litematica.config.Configs;
 import fi.dy.masa.litematica.data.DataManager;
-import fi.dy.masa.litematica.data.EntitiesDataStorage;
+import fi.dy.masa.litematica.data.EntityDataManager;
 import fi.dy.masa.litematica.mixin.world.IMixinWorldTickScheduler;
 import fi.dy.masa.litematica.network.ServuxLitematicaHandler;
 import fi.dy.masa.litematica.network.ServuxLitematicaPacket;
@@ -74,9 +78,7 @@ import fi.dy.masa.litematica.selection.Box;
 import fi.dy.masa.litematica.util.*;
 import fi.dy.masa.litematica.util.EntityUtils;
 import fi.dy.masa.litematica.util.WorldUtils;
-import fi.dy.masa.litematica.world.ChunkSchematic;
 import fi.dy.masa.litematica.world.SchematicWorldHandler;
-import fi.dy.masa.litematica.world.WorldSchematic;
 
 public class LitematicaSchematic
 {
@@ -443,10 +445,10 @@ public class LitematicaSchematic
      * This version is not Chunk-Specific.  It is only used by {@link WorldUtils} during conversions.
      */
     private boolean placeBlocksToWorld(Level world, BlockPos origin, BlockPos regionPos, BlockPos regionSize,
-            SchematicPlacement schematicPlacement, SubRegionPlacement placement,
-            LitematicaBlockStateContainer container, Map<BlockPos, CompoundTag> tileMap,
-            @Nullable Map<BlockPos, ScheduledTick<Block>> scheduledBlockTicks,
-            @Nullable Map<BlockPos, ScheduledTick<Fluid>> scheduledFluidTicks, boolean notifyNeighbors)
+                                       SchematicPlacement schematicPlacement, SubRegionPlacement placement,
+                                       LitematicaBlockStateContainer container, Map<BlockPos, CompoundTag> tileMap,
+                                       @Nullable Map<BlockPos, ScheduledTick<Block>> scheduledBlockTicks,
+                                       @Nullable Map<BlockPos, ScheduledTick<Fluid>> scheduledFluidTicks, boolean notifyNeighbors)
     {
         // These are the untransformed relative positions
         BlockPos posEndRelSub = PositionUtils.getRelativeEndPositionFromAreaSize(regionSize);
@@ -702,6 +704,7 @@ public class LitematicaSchematic
 
             for (Entity entity : entities)
             {
+                if (entity instanceof EnderDragonPart) { continue; }
                 NbtView view = NbtView.getWriter(world.registryAccess());
 
                 entity.saveWithoutId(view.getWriter());
@@ -727,8 +730,8 @@ public class LitematicaSchematic
      * This is used by {@link TaskSaveSchematic}
      */
     public void takeEntitiesFromWorldWithinChunk(Level world, int chunkX, int chunkZ,
-            ImmutableMap<String, IntBoundingBox> volumes, ImmutableMap<String, Box> boxes,
-            Set<UUID> existingEntities, BlockPos origin)
+                                                 ImmutableMap<String, IntBoundingBox> volumes, ImmutableMap<String, Box> boxes,
+                                                 Set<UUID> existingEntities, BlockPos origin)
     {
         for (Map.Entry<String, IntBoundingBox> entry : volumes.entrySet())
         {
@@ -747,6 +750,7 @@ public class LitematicaSchematic
 
             for (Entity entity : entities)
             {
+                if (entity instanceof EnderDragonPart) { continue; }
                 UUID uuid = entity.getUUID();
                 /*
                 if (entity.posX >= bb.minX && entity.posX < bb.maxX &&
@@ -757,9 +761,9 @@ public class LitematicaSchematic
                 {
                     CompoundTag tag = new CompoundTag();
 
-                    if (EntitiesDataStorage.getInstance().hasServuxServer())
+                    if (EntityDataManager.getInstance().hasServuxServer() || EntityDataManager.getInstance().hasBackupStatus())
                     {
-                        CompoundTag serverTags = EntitiesDataStorage.getInstance().getFromEntityCacheNbt(entity.getId());
+                        CompoundTag serverTags = EntityDataManager.getInstance().getFromEntityCacheNbt(entity.getId());
 
                         if (serverTags != null && !serverTags.isEmpty())
                         {
@@ -775,8 +779,12 @@ public class LitematicaSchematic
                         {
                             tag = view.readNbt() != null ? view.readNbt() : new CompoundTag();
                             Identifier id = EntityType.getKey(entity.getType());
-                            tag.putString("id", id.toString());
-                            tag.putInt("LastEntityID", entity.getId());
+
+                            if (tag != null && id != null)
+                            {
+                                tag.putString("id", id.toString());
+                                tag.putInt("LastEntityID", entity.getId());
+                            }
                         }
                     }
 
@@ -1049,7 +1057,7 @@ public class LitematicaSchematic
     }
 
     /**
-     * This is used by both {@link TaskProcessChunkBase} and {@link TaskPasteSchematicPerChunkDirect}
+     * This is used by both {@link TaskProcessChunkBase}, {@link TaskSaveSchematic}, and {@link TaskPasteSchematicPerChunkDirect}
      */
     @SuppressWarnings("unchecked")
     public void takeBlocksFromWorldWithinChunk(Level world, ImmutableMap<String, IntBoundingBox> volumes,
@@ -1124,24 +1132,32 @@ public class LitematicaSchematic
                         {
                             BlockEntity te = world.getBlockEntity(posMutable);
 
-                            if (te != null)
+                            if (EntityDataManager.getInstance().hasServuxServer())
+                            {
+                                CompoundTag tag = EntityDataManager.getInstance().getFromBlockEntityCacheNbt(posMutable.immutable());
+
+                                if (tag != null && !tag.isEmpty())
+                                {
+                                    BlockPos pos = new BlockPos(x, y, z);
+                                    NbtUtils.writeBlockPosToTag(pos, tag);
+                                    tileEntityMap.put(pos, tag);
+                                }
+                                else if (te != null)
+                                {
+                                    BlockPos pos = new BlockPos(x, y, z);
+                                    tag = te.saveWithFullMetadata(world.registryAccess());
+                                    NbtUtils.writeBlockPosToTag(pos, tag);
+                                    tileEntityMap.put(pos, tag);
+                                }
+                            }
+                            else if (te != null)
                             {
                                 BlockPos pos = new BlockPos(x, y, z);
                                 CompoundTag tag = te.saveWithFullMetadata(world.registryAccess());
                                 NbtUtils.writeBlockPosToTag(pos, tag);
                                 tileEntityMap.put(pos, tag);
                             }
-                            else if (EntitiesDataStorage.getInstance().hasServuxServer())
-                            {
-                                CompoundTag tag = EntitiesDataStorage.getInstance().getFromBlockEntityCacheNbt(posMutable);
 
-                                if (tag != null && tag.isEmpty() == false)
-                                {
-                                    BlockPos pos = new BlockPos(x, y, z);
-                                    NbtUtils.writeBlockPosToTag(pos, tag);
-                                    tileEntityMap.put(pos, tag);
-                                }
-                            }
                         }
                     }
                 }
@@ -1343,16 +1359,18 @@ public class LitematicaSchematic
         return tagList;
     }
 
+    @Deprecated(forRemoval = true)
+    @ApiStatus.Experimental
     public void sendTransmitFile(CompoundTag nbtIn, final long sessionKey, boolean printMessage)
     {
-        if (EntitiesDataStorage.getInstance().hasServuxServer() == false)
+        if (EntityDataManager.getInstance().hasServuxServer() == false)
         {
             if (printMessage)
             {
                 InfoUtils.showGuiOrInGameMessage(MessageType.ERROR, "litematica.message.error.schematic_transmit_not_available");
             }
 
-            Litematica.LOGGER.error("transmitFileToServux: Cannot transmit a Litematic without having Servux present.");
+            Litematica.LOGGER.error("sendTransmitFile: Cannot transmit a Litematic without having Servux present.");
             return;
         }
 
@@ -1363,11 +1381,26 @@ public class LitematicaSchematic
 
         Path file = this.getFile();
         CompoundTag output = new CompoundTag();
+        final int bufferSize = SchematicBuffer.BUFFER_SIZE;
+        long totalBytes;
+        int totalSlices;
+
+        try
+        {
+            totalBytes = Files.size(file);
+            totalSlices = (int) ((totalBytes + bufferSize - 1) / bufferSize);
+        }
+        catch (IOException e)
+        {
+            Litematica.LOGGER.error("sendTransmitFile: Unable to read file size; {}", e.getLocalizedMessage());
+            return;
+        }
 
         output.putString("Task", "Litematic-TransmitStart");
-        output.putString("FileName", file.getFileName().toString());
         output.store("FileType", FileType.CODEC, this.schematicType);
         output.putLong("SliceKey", sessionKey);
+        output.putInt("TotalSlices", totalSlices);
+        output.putLong("TotalSize", totalBytes);
 
         if (!nbtIn.isEmpty())
         {
@@ -1377,30 +1410,28 @@ public class LitematicaSchematic
         ServuxLitematicaHandler.getInstance().encodeClientData(ServuxLitematicaPacket.ResponseC2SStart(output));
 
         // File Stream
-        final int bufferSize = SchematicBuffer.BUFFER_SIZE;
-        byte[] buffer = new byte[bufferSize];
-        int totalBytes = 0;
-        int totalSlices = 0;
         output.putLong("SliceKey", sessionKey);
+        byte[] buffer = new byte[bufferSize];
+        int currentSlice = 0;
 
         try (InputStream is = Files.newInputStream(file))
         {
             int bytesRead = 0;
             output.putString("Task", "Litematic-TransmitData");
 
-            while (bytesRead != -1)
+            while ((bytesRead = is.read(buffer, 0, bufferSize)) != -1)
             {
                 output.remove("Slice");
                 output.remove("Size");
                 output.remove("Data");
-
-                bytesRead = is.read(buffer, 0, bufferSize);
                 output.putInt("Slice", totalSlices);
                 output.putInt("Size", bytesRead);
-                output.putByteArray("Data", buffer);
+
+                byte[] correctedData = new byte[bytesRead];
+                System.arraycopy(buffer, 0, correctedData, 0, bytesRead);
+                output.putByteArray("Data", correctedData);
                 ServuxLitematicaHandler.getInstance().encodeClientData(ServuxLitematicaPacket.ResponseC2SStart(output));
-                totalBytes += bytesRead;
-                totalSlices++;
+                currentSlice++;
             }
         }
         catch (Exception err)
@@ -1414,7 +1445,7 @@ public class LitematicaSchematic
             output.putLong("SliceKey", sessionKey);
             output.putString("Task", "Litematic-TransmitCancel");
             ServuxLitematicaHandler.getInstance().encodeClientData(ServuxLitematicaPacket.ResponseC2SStart(output));
-            Litematica.LOGGER.error("sliceForServux: Exception reading file; {}", err.getLocalizedMessage());
+            Litematica.LOGGER.error("sendTransmitFile: Exception reading file; {}", err.getLocalizedMessage());
             return;
         }
 
@@ -1423,11 +1454,9 @@ public class LitematicaSchematic
         output.remove("Size");
         output.remove("Data");
 
-        output.putInt("TotalSize", totalBytes);
-        output.putInt("TotalSlices", totalSlices);
         output.putString("Task", "Litematic-TransmitEnd");
         ServuxLitematicaHandler.getInstance().encodeClientData(ServuxLitematicaPacket.ResponseC2SStart(output));
-        Litematica.debugLog("receiveFileTransmit: Transmitted file '{}', [tS: {}, tB: {}]", file.toAbsolutePath().toString(), totalSlices, totalBytes);
+        Litematica.debugLog("sendTransmitFile: Transmitted file '{}', [tS: {}, tB: {}]", file.toAbsolutePath().toString(), totalSlices, totalBytes);
 
         if (printMessage)
         {
@@ -1435,6 +1464,8 @@ public class LitematicaSchematic
         }
     }
 
+    @Deprecated(forRemoval = true)
+    @ApiStatus.Experimental
     public static @Nullable Pair<LitematicaSchematic, CompoundTag> receiveFileTransmit(CompoundTag nbt)
     {
         SchematicBufferManager manager = DataManager.getSchematicBufferManager();
@@ -1452,9 +1483,10 @@ public class LitematicaSchematic
             case "Litematic-TransmitStart" ->
             {
                 FileType type = nbt.read("FileType", FileType.CODEC).orElse(FileType.LITEMATICA_SCHEMATIC);
-                String name = nbt.getStringOr("FileName", "default_file");
+                final int totalSlices = nbt.getIntOr("TotalSlices", 1);
+                final long totalSize = nbt.getLongOr("TotalSize", -1L);
 
-                manager.createBuffer(name, type, key, nbt.getCompoundOrEmpty("PlacementData"));
+                manager.createBuffer(totalSlices, totalSize, type, key, nbt.getCompoundOrEmpty("PlacementData"));
             }
             case "Litematic-TransmitData" ->
             {
@@ -1477,8 +1509,8 @@ public class LitematicaSchematic
             }
             case "Litematic-TransmitEnd" ->
             {
-                final int totalSize = nbt.getIntOr("TotalSize", -1);
                 final int totalSlices = nbt.getIntOr("TotalSlices", -1);
+                final long totalSize = nbt.getLongOr("TotalSize", -1L);
                 Path dir = DataManager.getSchematicTransmitDirectory();
                 CompoundTag optional = manager.getOptionalNbt(key);
                 LitematicaSchematic schematic = manager.finishBuffer(key, dir);
@@ -1490,7 +1522,7 @@ public class LitematicaSchematic
                 }
 
                 // Successful transmission
-                Litematica.debugLog("receiveFileTransmit: Received file '{}', [tS: {}, tB: {}]", schematic.getFile().toAbsolutePath().toString(), totalSlices, totalSize);
+                Litematica.LOGGER.warn("receiveFileTransmit: Received file '{}', [tS: {}, tB: {}]", schematic.getFile().getFileName().toString(), totalSlices, totalSize);
                 return Pair.of(schematic, optional);
             }
             default ->
@@ -1528,7 +1560,23 @@ public class LitematicaSchematic
                 this.metadata.setSchematicVersion(version);
                 this.metadata.setMinecraftDataVersion(minecraftDataVersion);
                 this.metadata.setFileType(FileType.LITEMATICA_SCHEMATIC);
-                this.readSubRegionsFromNBT(nbt.getCompoundOrEmpty("Regions"), version, minecraftDataVersion);
+                try
+                {
+                    this.readSubRegionsFromNBT(nbt.getCompoundOrEmpty("Regions"), version, minecraftDataVersion);
+                }
+                catch (OutOfMemoryError e)
+                {
+                    this.blockContainers.clear();
+                    this.tileEntities.clear();
+                    this.entities.clear();
+                    this.pendingBlockTicks.clear();
+                    this.subRegionPositions.clear();
+                    this.subRegionSizes.clear();
+                    System.gc();
+
+                    InfoUtils.showGuiOrInGameMessage(MessageType.ERROR, "litematica.error.schematic_load.out_of_memory", e.getLocalizedMessage());
+                    return false;
+                }
 
                 return true;
             }
@@ -2092,7 +2140,7 @@ public class LitematicaSchematic
     {
         Vec3i size = readSizeFromTagImpl(tag);
 
-        if (tag.contains("palette") &&
+        if ((tag.contains("palette") || tag.contains("palettes")) &&
             tag.contains("blocks") &&
             isSizeValid(size))
         {
@@ -2125,11 +2173,29 @@ public class LitematicaSchematic
     {
         Vec3i size = readSizeFromTagImpl(tag);
 
-        if (tag.contains("palette") &&
+        if ((tag.contains("palette") || tag.contains("palettes")) &&
             tag.contains("blocks") &&
             isSizeValid(size))
         {
-            ListTag paletteTag = tag.getListOrEmpty("palette");
+            ListTag paletteTag;
+
+            if (tag.contains("palette"))
+            {
+                paletteTag = tag.getListOrEmpty("palette");
+            }
+            else if (tag.contains("palettes"))
+            {
+                ListTag palettes = tag.getListOrEmpty("palettes");
+                final int pSize = palettes.size();
+                Random rand = new Random();
+                int seed = rand.nextInt(0, (pSize - 1));
+
+                paletteTag = palettes.getListOrEmpty(seed);
+            }
+            else
+            {
+                return false;
+            }
             int minecraftDataVersion = tag.contains("DataVersion") ? tag.getIntOr("DataVersion", Configs.Generic.DATAFIXER_DEFAULT_SCHEMA.getIntegerValue()) : Configs.Generic.DATAFIXER_DEFAULT_SCHEMA.getIntegerValue();
 
             Map<BlockPos, CompoundTag> tileMap = new HashMap<>();
@@ -2739,11 +2805,11 @@ public class LitematicaSchematic
 
             return true;
         }
-        catch (Exception e)
+        catch (Throwable e)
         {
             InfoUtils.showGuiOrInGameMessage(MessageType.ERROR, "litematica.error.schematic_write_to_file_failed.exception", fileSchematic.toAbsolutePath());
             Litematica.LOGGER.error(StringUtils.translate("litematica.error.schematic_write_to_file_failed.exception", fileSchematic.toAbsolutePath()), e);
-            Litematica.LOGGER.error(e.getMessage());
+            Litematica.LOGGER.error(e.getLocalizedMessage());
         }
 
         return false;

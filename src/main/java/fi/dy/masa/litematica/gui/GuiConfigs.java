@@ -56,6 +56,13 @@ public class GuiConfigs extends GuiConfigsBase implements IConfigGuiAllTab
 //        x += this.createButton(x, y, -1, ConfigGuiTab.TEST);
     }
 
+    @Override
+    public void removed()
+    {
+        super.removed();
+        Configs.checkBaseLanguage();
+    }
+
     private int createButton(int x, int y, int width, ConfigGuiTab tab)
     {
         ButtonGeneric button = new ButtonGeneric(x, y, width, 20, tab.getDisplayName());
@@ -70,11 +77,15 @@ public class GuiConfigs extends GuiConfigsBase implements IConfigGuiAllTab
     {
         ConfigGuiTab tab = DataManager.getConfigGuiTab();
 
-        if (tab == ConfigGuiTab.GENERIC || tab == ConfigGuiTab.INFO_OVERLAYS || tab == ConfigGuiTab.VISUALS)
+        if (tab == ConfigGuiTab.INFO_OVERLAYS)
         {
             return 140;
         }
-        if (tab == ConfigGuiTab.COLORS)
+        else if (tab == ConfigGuiTab.GENERIC || tab == ConfigGuiTab.VISUALS)
+        {
+            return 180;
+        }
+        else if (tab == ConfigGuiTab.COLORS)
         {
             return 100;
         }
@@ -89,6 +100,7 @@ public class GuiConfigs extends GuiConfigsBase implements IConfigGuiAllTab
 
         return  tab == ConfigGuiTab.ALL ||
                 tab == ConfigGuiTab.GENERIC ||
+                tab == ConfigGuiTab.VISUALS ||
                 tab == ConfigGuiTab.HOTKEYS;
     }
 

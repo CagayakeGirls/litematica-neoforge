@@ -21,10 +21,13 @@ import com.mojang.blaze3d.vertex.VertexFormat;
 import net.minecraft.CrashReport;
 import net.minecraft.CrashReportCategory;
 import net.minecraft.ReportedException;
+import net.minecraft.SharedConstants;
 import net.minecraft.client.Camera;
+import net.minecraft.client.CameraType;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.ClientMannequin;
+import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.renderer.DynamicUniforms;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.block.BlockRenderDispatcher;
@@ -47,10 +50,12 @@ import net.minecraft.core.Direction;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.ARGB;
 import net.minecraft.util.RandomSource;
+import net.minecraft.util.debug.DebugValueAccess;
 import net.minecraft.util.profiling.Profiler;
 import net.minecraft.util.profiling.ProfilerFiller;
 import net.minecraft.world.entity.Avatar;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.animal.AgeableWaterCreature;
 import net.minecraft.world.entity.animal.equine.AbstractHorse;
 import net.minecraft.world.entity.animal.fish.Cod;
@@ -58,6 +63,8 @@ import net.minecraft.world.entity.animal.fish.Salmon;
 import net.minecraft.world.entity.animal.fish.TropicalFish;
 import net.minecraft.world.entity.animal.frog.Tadpole;
 import net.minecraft.world.level.BlockAndTintGetter;
+import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
+import net.minecraft.world.entity.boss.enderdragon.EnderDragonPart;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.RenderShape;
@@ -84,6 +91,7 @@ import fi.dy.masa.litematica.mixin.render.IMixinGameRenderer;
 import fi.dy.masa.litematica.render.IWorldSchematicRenderer;
 import fi.dy.masa.litematica.render.schematic.blocks.FallbackBlocks;
 import fi.dy.masa.litematica.util.IAvatarInvoker;
+import fi.dy.masa.litematica.util.IEntityHitboxDebugRendererInvoker;
 import fi.dy.masa.litematica.util.IEntityInvoker;
 import fi.dy.masa.litematica.util.IEntityRendererInvoker;
 import fi.dy.masa.litematica.world.ChunkSchematic;
@@ -98,15 +106,14 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
     private final BlockEntityRenderDispatcher blockEntityRenderManager;
     private BlockRenderDispatcher blockRenderManager;
     private final BlockModelRendererSchematic blockModelRenderer;
-    private final Set<BlockEntity> blockEntities;
+//    private final Set<BlockEntity> blockEntities;
     private final List<ChunkRendererSchematicVbo> renderInfos;
-    private final SchematicRenderState schematicRenderState;
+    private SchematicRenderState schematicRenderState;
     private Set<ChunkRendererSchematicVbo> chunksToUpdate;
     private WorldSchematic world;
     private ChunkRenderDispatcherSchematic chunkRendererDispatcher;
+    private ChunkRenderGpuDispatcher chunkRendererGpuDispatcher;
     private FogRenderer fogRenderer;
-    private ChunkFixUniform chunkFixUniform;
-    private ChunkRenderBatchDraw batchDraw;
     private GpuBufferSlice vanillaFogBuffer;
     private ProfilerFiller profiler;
     private double lastCameraChunkUpdateX;
@@ -119,8 +126,6 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
     private float lastCameraYaw;
     private ChunkRenderDispatcherLitematica renderDispatcher;
     private final IChunkRendererFactory renderChunkFactory;
-    //private ShaderGroup entityOutlineShader;
-    //private boolean entityOutlinesRendered;
 
     private final HashMap<Vec3, UUID> renderedEntities;
     private int renderDistanceChunks;
@@ -140,7 +145,7 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
         this.mc = mc;
         this.renderChunkFactory = ChunkRendererSchematicVbo::new;
         this.blockRenderManager = Minecraft.getInstance().getBlockRenderer();
-	    this.blockEntities = new HashSet<>();
+//	    this.blockEntities = new HashSet<>();
 	    this.renderInfos = new ArrayList<>(1024);
         this.renderedEntities = new HashMap<>();
         this.entityRenderManager = mc.getEntityRenderDispatcher();
@@ -148,12 +153,10 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
         this.blockModelRenderer = new BlockModelRendererSchematic(mc.getBlockColors(), this.blockRenderManager);
         this.blockModelRenderer.setBakedManager(mc.getModelManager());
         this.fogRenderer = ((IMixinGameRenderer) mc.gameRenderer).litematica_getFogRenderer();
-		this.schematicRenderState = new SchematicRenderState();
+		this.schematicRenderState = this.getSchematicRenderState();
 	    this.chunksToUpdate = new LinkedHashSet<>();
         this.profiler = null;
         this.vanillaFogBuffer = null;
-        this.batchDraw = null;
-        this.chunkFixUniform = new ChunkFixUniform();
         this.shouldDraw = false;
 	    this.lastCameraChunkUpdateX = Double.MIN_VALUE;
 	    this.lastCameraChunkUpdateY = Double.MIN_VALUE;
@@ -184,8 +187,13 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
     public String getDebugInfoRenders()
     {
         int rcTotal = this.chunkRendererDispatcher != null ? this.chunkRendererDispatcher.getRendererCount() : 0;
+        int rcGpuTotal = this.chunkRendererGpuDispatcher != null ? this.chunkRendererGpuDispatcher.size() : 0;
         int rcRendered = this.chunkRendererDispatcher != null ? this.getRenderedChunks() : 0;
-        return String.format("C: %02d/%02d %sD: %02d, L: %02d, %s", rcRendered, rcTotal, this.mc.smartCull ? "(s) " : "", this.renderDistanceChunks, 0, this.renderDispatcher == null ? "null" : this.renderDispatcher.getDebugInfo());
+        return String.format(
+                "C: %02d/%02d gU: %02d, %sD: %02d, L: %02d, %s", rcRendered, rcTotal, rcGpuTotal,
+                this.mc.smartCull ? "(s) " : "",
+                this.renderDistanceChunks, 0,
+                this.renderDispatcher == null ? "null" : this.renderDispatcher.getDebugInfo());
     }
 
     @Override
@@ -205,8 +213,6 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
 
         for (ChunkRendererSchematicVbo chunkRenderer : this.renderInfos)
         {
-            // Threaded Code
-            //ChunkRenderDataSchematic data = chunkRenderer.chunkRenderData.get();
             ChunkRenderDataSchematic data = chunkRenderer.chunkRenderData;
 
             if (data != ChunkRenderDataSchematic.EMPTY && !data.isBlockLayerEmpty())
@@ -231,15 +237,44 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
     }
 
     @Override
-    public EntityRenderDispatcher getEntityRenderer()
+    @Nullable
+    public ChunkRenderGpuDispatcher getChunkRendererGpuDispatcher()
     {
-        return this.entityRenderManager;
+        return this.chunkRendererGpuDispatcher;
     }
 
     @Override
     public BlockEntityRenderDispatcher getBlockEntityRenderer()
     {
         return this.blockEntityRenderManager;
+    }
+
+    @Override
+    public EntityRenderDispatcher getEntityRenderer()
+    {
+        return this.entityRenderManager;
+    }
+
+    @Override
+    public FogRenderer getFogRenderer()
+    {
+        if (this.fogRenderer == null)
+        {
+            this.fogRenderer = ((IMixinGameRenderer) this.mc.gameRenderer).litematica_getFogRenderer();
+        }
+
+        return this.fogRenderer;
+    }
+
+    @Override
+    public SchematicRenderState getSchematicRenderState()
+    {
+        if (this.schematicRenderState == null)
+        {
+            this.schematicRenderState = new SchematicRenderState();
+        }
+
+        return this.schematicRenderState;
     }
 
     @Override
@@ -280,18 +315,7 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
 
     protected GpuBufferSlice getEmptyFogBuffer()
     {
-        if (this.fogRenderer == null)
-        {
-            this.fogRenderer = ((IMixinGameRenderer) this.mc.gameRenderer).litematica_getFogRenderer();
-        }
-
-        return this.fogRenderer.getBuffer(FogRenderer.FogMode.NONE);
-    }
-
-    @Override
-    public ChunkFixUniform getChunkFixUniform()
-    {
-        return this.chunkFixUniform;
+        return this.getFogRenderer().getBuffer(FogRenderer.FogMode.NONE);
     }
 
     @Override
@@ -321,6 +345,12 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
                 this.chunkRendererDispatcher = null;
             }
 
+            if (this.chunkRendererGpuDispatcher != null)
+            {
+                this.chunkRendererGpuDispatcher.destroy();
+                this.chunkRendererGpuDispatcher = null;
+            }
+
             if (this.renderDispatcher != null)
             {
                 this.renderDispatcher.stopWorkerThreads();
@@ -329,19 +359,18 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
             this.renderDispatcher = null;
             this.profiler = null;
 
-            this.clearBlockBatchDraw();
 			this.clearWorldRenderStates();
-            this.clearChunkFixUniform();
+            this.getSchematicRenderState().clearChunkFixUniform();
 
             if (this.vanillaFogBuffer != null)
             {
                 this.vanillaFogBuffer = null;
             }
 
-            synchronized (this.blockEntities)
-            {
-                this.blockEntities.clear();
-            }
+//            synchronized (this.blockEntities)
+//            {
+//                this.blockEntities.clear();
+//            }
         }
     }
 
@@ -362,7 +391,7 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
 
             if (this.renderDispatcher == null)
             {
-                this.renderDispatcher = new ChunkRenderDispatcherLitematica(profiler);
+                this.renderDispatcher = new ChunkRenderDispatcherLitematica();
             }
 
             this.displayListEntitiesDirty = true;
@@ -373,16 +402,22 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
                 this.chunkRendererDispatcher.delete();
             }
 
-            this.stopChunkUpdates(profiler);
-            this.clearBlockBatchDraw();
-			this.clearWorldRenderStates();
-
-            synchronized (this.blockEntities)
+            if (this.chunkRendererGpuDispatcher != null)
             {
-                this.blockEntities.clear();
+                this.chunkRendererGpuDispatcher.destroy();
+                this.chunkRendererGpuDispatcher = null;
             }
 
+            this.stopChunkUpdates(profiler);
+			this.clearWorldRenderStates();
+
+//            synchronized (this.blockEntities)
+//            {
+//                this.blockEntities.clear();
+//            }
+
             this.chunkRendererDispatcher = new ChunkRenderDispatcherSchematic(this.world, this.renderDistanceChunks, this, this.renderChunkFactory);
+            this.chunkRendererGpuDispatcher = new ChunkRenderGpuDispatcher(this.world, this);
             this.renderEntitiesStartupCounter = 2;
 
             profiler.pop();
@@ -398,9 +433,8 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
         }
 
         this.chunksToUpdate.clear();
-        this.renderDispatcher.stopChunkUpdates(profiler);
+        this.renderDispatcher.stopChunkUpdates();
         this.profiler = null;
-        this.clearBlockBatchDraw();
 		this.clearWorldRenderStates();
         this.vanillaFogBuffer = null;
     }
@@ -559,7 +593,7 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
                     profiler.push("update_now");
                     this.profiler = profiler;
 
-                    this.renderDispatcher.updateChunkNow(chunkRendererTmp, profiler);
+                    this.renderDispatcher.updateChunkNow(chunkRendererTmp);
                     chunkRendererTmp.clearNeedsUpdate();
 
                     profiler.pop();
@@ -569,12 +603,11 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
 
         this.chunksToUpdate.addAll(set);
 
-//        if (Reference.DEBUG_MODE && !this.chunksToUpdate.isEmpty())
-//        {
-//            Litematica.LOGGER.warn("[WorldRenderer] setupTerrain // chunksToUpdate: {}", this.chunksToUpdate.size());
-//        }
+        if (Reference.DEBUG_MODE && !this.chunksToUpdate.isEmpty())
+        {
+            Litematica.LOGGER.warn("[WorldRenderer] setupTerrain // chunksToUpdate: {}", this.chunksToUpdate.size());
+        }
 
-        this.clearBlockBatchDraw();
 		this.clearWorldRenderStates();
 
         //profiler.pop();
@@ -587,7 +620,7 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
         //LOGGER.warn("[WorldRenderer] updateChunks()");
         this.profiler = profiler;
         profiler.push("run_chunk_updates");
-        this.displayListEntitiesDirty |= this.renderDispatcher.runChunkUploads(finishTimeNano, profiler);
+        this.displayListEntitiesDirty |= this.renderDispatcher.runChunkUploads(finishTimeNano);
 
         if (this.profiler == null)
         {
@@ -609,11 +642,11 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
 
                 if (immediate)
                 {
-                    flag = this.renderDispatcher.updateChunkNow(renderChunk, profiler);
+                    flag = this.renderDispatcher.updateChunkNow(renderChunk);
                 }
                 else
                 {
-                    flag = this.renderDispatcher.updateChunkLater(renderChunk, profiler);
+                    flag = this.renderDispatcher.updateChunkLater(renderChunk);
                 }
 
                 if (!flag)
@@ -658,7 +691,7 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
     {
 //        LOGGER.warn("[WorldRenderer] prepareBlockLayers()");
         this.profiler = profiler;
-        RenderSystem.assertOnRenderThread();
+//        RenderSystem.assertOnRenderThread();
         profiler.push("layer_multi_phase");
 
 	    ArrayList<DynamicUniforms.Transform> transformValues = new ArrayList<>();
@@ -702,6 +735,11 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
         for (int i = startIndex; i != stopIndex; i += increment)
         {
             ChunkRendererSchematicVbo renderer = this.renderInfos.get(i);
+            final ChunkRenderDataSchematic data = renderer.getChunkRenderData();
+            final ChunkMeshDataSchematic chunkMeshData = data.getMeshDataCache();
+            final BlockPos chunkOrigin = renderer.getOrigin();
+            final ChunkPos chunkPos = renderer.getChunkPos();
+            final ChunkRenderGpuUploader gpuUploader = this.chunkRendererGpuDispatcher.addOrGetUploader(chunkPos.x, chunkPos.z);
 
             for (ChunkSectionLayer layer : ChunkSectionLayer.values())
             {
@@ -709,10 +747,9 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
 
                 if (!renderer.getChunkRenderData().isBlockLayerEmpty(layer))
                 {
-                    BlockPos chunkOrigin = renderer.getOrigin();
-                    ChunkRenderObjectBuffers buffers = renderer.getBlockBuffersByBlockLayer(layer);
+                    ChunkRenderGpuBuffers buffers = gpuUploader.buffersOrNull(layer);
 
-                    if (buffers == null || buffers.isClosed() || !renderer.getChunkRenderData().getBuiltBufferCache().hasBuiltBufferByBlockLayer(layer))
+                    if (buffers == null || buffers.isClosed() || !chunkMeshData.hasMeshData(layer))
                     {
                         // LOGGER.error("Layer [{}], ChunkOrigin [{}], NO BUFFERS!", layer.name(), chunkOrigin.toShortString());
                         continue;
@@ -755,23 +792,6 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
                                              uploader.upload("DynamicTransforms", ((GpuBufferSlice[]) slices)[pos])
                              ));
 
-//                    int pos = chunkValues.size();
-
-//	                chunkValues.add(new DynamicUniforms.ChunkSectionInfo(
-//			                matrix4fc,
-//			                chunkOrigin.getX(), chunkOrigin.getY(), chunkOrigin.getZ(),
-//			                1.0f, atlasWidth, atlasHeight
-//	                ));
-//
-//	                renderMap.get(layer)
-//                            .add(new RenderPass.Draw<>(
-//                                    0, buffers.getVertexBuffer(),
-//                                    vertexBuffer, indexType,
-//                                    0, buffers.getIndexCount(),
-//                                    (slices, uploader) ->
-//                                            uploader.upload("ChunkSection", ((GpuBufferSlice[]) slices)[pos])
-//                            ));
-
                     startedDrawing = true;
                     ++count;
 
@@ -781,34 +801,18 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
 
         if (startedDrawing)
         {
-//	        GpuBufferSlice transformSlice = null;
-
-//			if (renderAsTranslucent)
-//			{
-//				transformSlice = RenderSystem.getDynamicUniforms()
-//				                                            .writeTransform(
-//						                                            matrix4fc,
-//						                                            colorMod,
-//						                                            modelOffset,
-//						                                            texMatrix
-//				                                            );
-//			}
-
-//            GpuBufferSlice[] sectionSlices = RenderSystem.getDynamicUniforms()
-//                                                         .writeChunkSections(
-//																 chunkValues.toArray(new DynamicUniforms.ChunkSectionInfo[0])
-//                                                         );
-
-            this.chunkFixUniform.fillBuffer(atlasWidth, atlasHeight, 1.0f);
+            profiler.popPush("fill_uniforms");
+            this.getSchematicRenderState().chunkFixUniform.fillBuffer(atlasWidth, atlasHeight, 1.0f);
             GpuBufferSlice[] transformSlices = RenderSystem.getDynamicUniforms()
                                                            .writeTransforms(
                                                                    transformValues.toArray(new DynamicUniforms.Transform[0])
                                                            );
 
-            this.batchDraw = new ChunkRenderBatchDraw(blockAtlas, renderMap,
+            profiler.popPush("fill_batch_draw");
+            this.getSchematicRenderState().batchDraw = new ChunkRenderBatchDraw(blockAtlas, renderMap,
                                                       renderCollidingBlocks, renderAsTranslucent, indexCount,
                                                       transformSlices,
-                                                      this.chunkFixUniform.getCurrentBuffer()
+                                                      this.getSchematicRenderState().chunkFixUniform.getCurrentBuffer()
             );
             this.shouldDraw = true;
         }
@@ -822,13 +826,13 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
     public void drawBlockLayerGroup(ChunkSectionLayerGroup group, @Nullable GpuSampler sampler)
     {
 //        LOGGER.warn("[WorldRenderer] drawBlockLayerGroup() [{}]", group.name());
-        if (this.batchDraw != null && this.shouldDraw)
+        if (this.getSchematicRenderState().hasBatchDraw() && this.shouldDraw)
         {
             this.profiler.push(Reference.MOD_ID + "_batch_draw_" + group.label());
 
             // Disable fog in the Schematic World
             RenderSystem.setShaderFog(this.getEmptyFogBuffer());
-            this.batchDraw.draw(group, sampler, this.profiler);
+            this.getSchematicRenderState().getBatchDraw().draw(group, sampler, this.profiler);
             RenderSystem.setShaderFog(this.vanillaFogBuffer);
 
             this.profiler.pop();
@@ -836,29 +840,15 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
     }
 
     @Override
-    public void clearBlockBatchDraw()
+    public ChunkFixUniform getChunkFixUniform()
     {
-        if (this.batchDraw != null)
-        {
-            this.batchDraw = null;
-        }
-
-        this.shouldDraw = false;
+        return this.getSchematicRenderState().chunkFixUniform;
     }
 
     @Override
     public void clearChunkFixUniform()
     {
-        if (this.chunkFixUniform != null)
-        {
-            try
-            {
-                this.chunkFixUniform.close();
-            }
-            catch (Exception ignored) { }
-        }
-
-        this.chunkFixUniform = new ChunkFixUniform();
+        this.getSchematicRenderState().clearChunkFixUniform();
     }
 
     @Override
@@ -866,6 +856,29 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
 	{
 		this.schematicRenderState.clear();
 	}
+
+    @Override
+    public void renderEntityDebugHitboxes(IEntityHitboxDebugRendererInvoker invoker, double cameraX, double cameraY, double cameraZ, DebugValueAccess debugValueAccess, Frustum frustum, float ticks)
+    {
+        if (this.hasWorld())
+        {
+            for (Entity e : this.world.getEntities().getAll())
+            {
+                if (!e.isInvisible() &&
+                    frustum.isVisible(e.getBoundingBox()) &&
+                    (e != this.mc.getCameraEntity() || this.mc.options.getCameraType() != CameraType.FIRST_PERSON))
+                {
+	                invoker.litematica$addEntityHitbox(e, ticks, false);
+
+                    if (SharedConstants.DEBUG_SHOW_LOCAL_SERVER_ENTITY_HIT_BOXES)
+                    {
+                        // Shrug; because the schem world is basically the "server-side" also.
+                        invoker.litematica$addEntityHitbox(e, ticks, true);
+                    }
+                }
+            }
+        }
+    }
 
     @Override
 	public void updateCameraState(Camera camera, float tickProgress)
@@ -876,25 +889,6 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
 		this.schematicRenderState.cameraState.entityPos = camera.entity().getRopeHoldPosition(tickProgress);
 		this.schematicRenderState.cameraState.orientation = new Quaternionf(camera.rotation());
 	}
-
-//    public void scheduleChunkUploads(Vec3 cameraPos, ProfilerFiller profiler)
-//    {
-//        LOGGER.warn("scheduleChunkUploads()");
-//        double x = cameraPos.x();
-//        double y = cameraPos.y();
-//        double z = cameraPos.z();
-//
-//        this.profiler = profiler;
-//
-//        for (ChunkRendererSchematicVbo chunkRenderer : this.renderInfos)
-//        {
-//            if ((!chunkRenderer.getChunkRenderData().isBlockLayerEmpty() ||
-//                (chunkRenderer.getChunkRenderData() != ChunkRenderDataSchematic.EMPTY && chunkRenderer.hasOverlay())))
-//            {
-//                this.renderDispatcher.uploadChunkLater(chunkRenderer, profiler);
-//            }
-//        }
-//    }
 
     @Override
     public void scheduleTranslucentSorting(Vec3 cameraPos, ProfilerFiller profiler)
@@ -921,7 +915,7 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
                 if ((chunkRenderer.getChunkRenderData().isBlockLayerStarted(ChunkSectionLayer.TRANSLUCENT) ||
                     (chunkRenderer.getChunkRenderData() != ChunkRenderDataSchematic.EMPTY && chunkRenderer.hasOverlay())) && h++ < 15)
                 {
-                    this.renderDispatcher.updateTransparencyLater(chunkRenderer, profiler);
+                    this.renderDispatcher.updateTransparencyLater(chunkRenderer);
                 }
             }
         }
@@ -963,14 +957,17 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
 
             if (renderer.getChunkRenderData() != ChunkRenderDataSchematic.EMPTY && renderer.hasOverlay())
             {
-                ChunkRenderDataSchematic compiledChunk = renderer.getChunkRenderData();
+                final ChunkRenderDataSchematic compiledChunk = renderer.getChunkRenderData();
+                final ChunkMeshDataSchematic chunkMeshData = compiledChunk.getMeshDataCache();
+                final BlockPos chunkOrigin = renderer.getOrigin();
+                final ChunkPos cp = renderer.getChunkPos();
+                ChunkRenderGpuUploader gpuUploader = this.chunkRendererGpuDispatcher.addOrGetUploader(cp.x, cp.z);
 
                 if (!compiledChunk.isOverlayTypeEmpty(type))
                 {
-                    ChunkRenderObjectBuffers buffers = renderer.getOverlayBuffersByType(type);
-                    BlockPos chunkOrigin = renderer.getOrigin();
+                    ChunkRenderGpuBuffers buffers = gpuUploader.buffersOrNull(type);
 
-                    if (buffers == null || buffers.isClosed() || !renderer.getChunkRenderData().getBuiltBufferCache().hasBuiltBufferByType(type))
+                    if (buffers == null || buffers.isClosed() || !chunkMeshData.hasMeshData(type))
                     {
                         // LOGGER.error("Overlay [{}], ChunkOrigin [{}], NO BUFFERS", type.name(), chunkOrigin.toShortString());
                         continue;
@@ -1049,7 +1046,7 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
 
     // Probably not the most efficient way; but it works.
     private void drawOverlayInternal(RenderPipeline pipeline,
-                                     ChunkRenderObjectBuffers buffers,
+                                     ChunkRenderGpuBuffers buffers,
                                      int color, float[] offset,
                                      boolean useColor, boolean useOffset) throws RuntimeException
     {
@@ -1258,33 +1255,77 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
                     if ((this.renderedEntities.containsKey(entityTmp.position()) && this.renderedEntities.get(entityTmp.position()).equals(entityTmp.getUUID())) ||
                         !layerRange.isPositionWithinRange(MathUtils.floor(entityTmp.getX()), MathUtils.floor(entityTmp.getY()), MathUtils.floor(entityTmp.getZ())))
                     {
-//                        LOGGER.warn("[WorldRenderer] prepareEntities/iterate: Chunk: {}, Skipping POS / UUID [{}]", chunkPos.toString(), entityTmp.position(), entityTmp.getStringUUID());
+//                        LOGGER.warn("[WorldRenderer] prepareEntities/iterate: Chunk: {}, Skipping POS {} / UUID [{}]", chunkPos.toString(), entityTmp.position(), entityTmp.getStringUUID());
                         continue;
                     }
 
 	                float tickProgress = tickCounter.getGameTimeDeltaPartialTick(false);
+                    boolean shouldRender;
 
-					if (entityTmp instanceof Avatar ple)
-					{
-                        if (ple instanceof ClientMannequin)
+                    if (entityTmp instanceof Avatar avatar)
+                    {
+                        if (avatar.getType().equals(EntityType.MANNEQUIN))
                         {
-                            ((IAvatarInvoker) ple).litematica$tryUpdateSkin();
-
-                            EntityRenderState state = ((IEntityRendererInvoker) this.entityRenderManager).litematica_getRenderStateNullSafe(entityTmp, tickProgress);
-
-                            if (state != null)
+                            try
                             {
-                                this.schematicRenderState.entityStates.add(state);
-                                this.renderedEntities.put(entityTmp.position(), entityTmp.getUUID());
-                                ++this.countEntitiesRendered;
+                                ClientMannequin cm = (ClientMannequin) avatar;
+                                ((IAvatarInvoker) cm).litematica$tryUpdateSkin();
+                                EntityRenderState state = ((IEntityRendererInvoker) this.getEntityRenderer()).litematica_getRenderStateNullSafe(cm, tickProgress);
+
+                                if (state != null)
+                                {
+                                    shouldRender = ((IEntityRendererInvoker) this.getEntityRenderer()).litematica_shouldRender(cm, frustum, cameraX, cameraY, cameraZ);
+
+                                    if (shouldRender)
+                                    {
+                                        this.schematicRenderState.entityStates.add(state);
+                                        this.renderedEntities.put(cm.position(), cm.getUUID());
+                                        ++this.countEntitiesRendered;
+                                    }
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                LOGGER.error("Exception rendering Mannequin [{}]; {}", avatar.getClass().getName(), ex.getLocalizedMessage());
+                            }
+                        }
+                        else if (avatar.getType().equals(EntityType.PLAYER))
+                        {
+                            try
+                            {
+                                AbstractClientPlayer acp = (AbstractClientPlayer) avatar;
+                                EntityRenderState state = ((IEntityRendererInvoker) this.getEntityRenderer()).litematica_getRenderStateNullSafe(acp, tickProgress);
+
+                                if (state != null)
+                                {
+                                    shouldRender = ((IEntityRendererInvoker) this.getEntityRenderer()).litematica_shouldRender(acp, frustum, cameraX, cameraY, cameraZ);
+
+                                    if (shouldRender)
+                                    {
+                                        this.schematicRenderState.entityStates.add(state);
+                                        this.renderedEntities.put(acp.position(), acp.getUUID());
+                                        ++this.countEntitiesRendered;
+                                    }
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                LOGGER.error("Exception rendering Player [{}]; {}", avatar.getClass().getName(), ex.getLocalizedMessage());
                             }
                         }
 
-						// Guess we can't render Player Models in the Schem world.
-						continue;
-					}
-
-                    boolean shouldRender = this.entityRenderManager.shouldRender(entityTmp, frustum, cameraX, cameraY, cameraZ);
+                        // Guess we can't (Or shouldn't) render Players
+                        continue;
+                    }
+                    else if (entityTmp instanceof EnderDragon || entityTmp instanceof EnderDragonPart)
+                    {
+                        shouldRender = true;
+                        // Still half broken.
+                    }
+                    else
+                    {
+                        shouldRender = ((IEntityRendererInvoker) this.getEntityRenderer()).litematica_shouldRender(entityTmp, frustum, cameraX, cameraY, cameraZ);
+                    }
 
                     if (shouldRender)
                     {
@@ -1368,28 +1409,28 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
 
 		profiler.popPush("block_entities");
         this.profiler = profiler;
-        this.schematicRenderState.tileEntityStates.clear();
+        this.schematicRenderState.blockEntityStates.clear();
 
         profiler.popPush("render_be");
         for (ChunkRendererSchematicVbo chunkRenderer : this.renderInfos)
         {
-            ChunkRenderDataSchematic data = chunkRenderer.getChunkRenderData();
-            List<BlockEntity> tiles = data.getBlockEntities();
+            final ChunkPos chunkPos = chunkRenderer.getChunkPos();
+            ChunkSchematic chunk = this.world.getChunkSource().getChunkForLighting(chunkPos.x, chunkPos.z);
 
-            if (!tiles.isEmpty())
+            if (chunk == null || chunk.isEmpty() || !DataManager.getSchematicPlacementManager().checkIfChunkShouldRender(chunkPos.x, chunkPos.z))
             {
-                BlockPos chunkOrigin = chunkRenderer.getOrigin();
-                ChunkPos chunkPos = chunkRenderer.getChunkPos();
-                ChunkSchematic chunk = this.world.getChunkSource().getChunkForLighting(chunkPos.x, chunkPos.z);
+                continue;
+            }
 
-                if (chunk == null || chunk.isEmpty() ||
-                    !DataManager.getSchematicPlacementManager().checkIfChunkShouldRender(chunkPos.x, chunkPos.z))
-                {
-                    continue;
-                }
+            final ChunkRenderDataSchematic data = chunkRenderer.getChunkRenderData();
 
-                if (chunk.getState().atLeast(ChunkSchematicState.LOADED) &&
-                    data.getTimeBuilt() >= chunk.getTimeCreated())
+            if (chunk.getState().atLeast(ChunkSchematicState.LOADED) && data.getTimeBuilt() >= chunk.getTimeCreated())
+            {
+                final ChunkMeshDataSchematic chunkMeshData = data.getMeshDataCache();
+                List<BlockEntity> tiles = chunkMeshData.getBlockEntities();
+                List<BlockEntity> noCullTiles = chunkMeshData.getNoCullBlockEntities();
+
+                if (!tiles.isEmpty())
                 {
                     for (BlockEntity te : tiles)
                     {
@@ -1405,8 +1446,8 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
                             matrices.pushPose();
                             matrices.translate(pos.getX() - cameraX, pos.getY() - cameraY, pos.getZ() - cameraZ);
                             BlockEntityRenderState state = this.blockEntityRenderManager.tryExtractRenderState(te, tickProgress, null);
-							this.schematicRenderState.tileEntityStates.add(state);
-							// Ignore crumbling, because there is no point in the Schem World.
+                            this.schematicRenderState.blockEntityStates.add(state);
+                            // Ignore crumbling, because there is no point in the Schem World.
                             matrices.popPose();
                         }
                         catch (Exception err)
@@ -1415,35 +1456,64 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
                         }
                     }
                 }
+
+                if (!noCullTiles.isEmpty())
+                {
+                    for (BlockEntity te : noCullTiles)
+                    {
+                        BlockPos pos = te.getBlockPos();
+
+                        if (!layerRange.isPositionWithinRange(pos.getX(), pos.getY(), pos.getZ()))
+                        {
+                            continue;
+                        }
+
+//                        LOGGER.warn("[WorldRenderer] prepareBlockEntities(): [NO-CULL] type: [{}], pos: [{}], level: [{}]", BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(te.getType()).toString(), te.getBlockPos(), te.getLevel().dimension().identifier().toString());
+
+                        try
+                        {
+                            matrices.pushPose();
+                            matrices.translate(pos.getX() - cameraX, pos.getY() - cameraY, pos.getZ() - cameraZ);
+                            BlockEntityRenderState state = this.getBlockEntityRenderer().tryExtractRenderState(te, tickProgress, null);
+                            this.schematicRenderState.blockEntityStates.add(state);
+                            // Ignore crumbling, because there is no point in the Schem World.
+                            matrices.popPose();
+                        }
+                        catch (Exception err)
+                        {
+                            LOGGER.error("[Pass 2] Error rendering blockEntities; Exception: {}", err.getLocalizedMessage());
+                        }
+                    }
+                }
             }
         }
 
-        profiler.popPush("render_be_no_cull");
-        synchronized (this.blockEntities)
-        {
-            for (BlockEntity te : this.blockEntities)
-            {
-                BlockPos pos = te.getBlockPos();
-
-                if (!layerRange.isPositionWithinRange(pos.getX(), pos.getY(), pos.getZ()))
-                {
-                    continue;
-                }
-
-                try
-                {
-                    matrices.pushPose();
-                    matrices.translate(pos.getX() - cameraX, pos.getY() - cameraY, pos.getZ() - cameraZ);
-					BlockEntityRenderState state = this.blockEntityRenderManager.tryExtractRenderState(te, tickProgress, null);
-					this.schematicRenderState.tileEntityStates.add(state);
-                    matrices.popPose();
-                }
-                catch (Exception err)
-                {
-                    LOGGER.error("[Pass 2] Error rendering blockEntities; Exception: {}", err.getLocalizedMessage());
-                }
-            }
-        }
+//        profiler.popPush("render_be_no_cull");
+//        synchronized (this.blockEntities)
+//        {
+//            for (BlockEntity te : this.blockEntities)
+//            {
+//                BlockPos pos = te.getBlockPos();
+//
+//                if (!layerRange.isPositionWithinRange(pos.getX(), pos.getY(), pos.getZ()))
+//                {
+//                    continue;
+//                }
+//
+//                try
+//                {
+//                    matrices.pushPose();
+//                    matrices.translate(pos.getX() - cameraX, pos.getY() - cameraY, pos.getZ() - cameraZ);
+//					BlockEntityRenderState state = this.blockEntityRenderManager.tryExtractRenderState(te, tickProgress, null);
+//					this.schematicRenderState.tileEntityStates.add(state);
+//                    matrices.popPose();
+//                }
+//                catch (Exception err)
+//                {
+//                    LOGGER.error("[Pass 2] Error rendering blockEntities; Exception: {}", err.getLocalizedMessage());
+//                }
+//            }
+//        }
 
         profiler.pop();
     }
@@ -1452,7 +1522,7 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
 	public void renderBlockEntities(Camera camera, Frustum frustum, PoseStack matrices, LevelRenderState renderStates, SubmitNodeCollector queue, ProfilerFiller profiler)
 	{
 //        LOGGER.warn("[WorldRenderer] renderBlockEntities()");
-        if (this.schematicRenderState.tileEntityStates.isEmpty())
+        if (this.schematicRenderState.blockEntityStates.isEmpty())
         {
             return;
         }
@@ -1464,7 +1534,7 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
 
 		profiler.push("render_block_entities");
 
-		for (BlockEntityRenderState state : this.schematicRenderState.tileEntityStates)
+		for (BlockEntityRenderState state : this.schematicRenderState.blockEntityStates)
 		{
             if (state != null)      // This should never be NULL
             {
@@ -1479,18 +1549,18 @@ public class WorldRendererSchematic implements IWorldSchematicRenderer
 		profiler.pop();
 	}
 
-    @Override
-    public void updateBlockEntities(Collection<BlockEntity> toRemove, Collection<BlockEntity> toAdd)
-    {
-        // LOGGER.warn("[WorldRenderer] updateBlockEntities()");
-//        int last = this.blockEntities.size();
-
-        synchronized (this.blockEntities)
-        {
-            this.blockEntities.removeAll(toRemove);
-            this.blockEntities.addAll(toAdd);
-        }
-    }
+//    @Override
+//    public void updateBlockEntities(Collection<BlockEntity> toRemove, Collection<BlockEntity> toAdd)
+//    {
+//        // LOGGER.warn("[WorldRenderer] updateBlockEntities()");
+////        int last = this.blockEntities.size();
+//
+//        synchronized (this.blockEntities)
+//        {
+//            this.blockEntities.removeAll(toRemove);
+//            this.blockEntities.addAll(toAdd);
+//        }
+//    }
 
     // `immediate` is only to be used with 'setBlockDirty()`
     @Override
