@@ -596,13 +596,15 @@ public class WorldUtils
 
     /**
      * Does a ray trace to the schematic world, and returns either the closest or the furthest hit block.
-     * @param closest
-     * @param mc
+     * @param closest -
+     * @param mc -
      * @return true if the correct item was or is in the player's hand after the pick block
      */
     public static boolean doSchematicWorldPickBlock(boolean closest, Minecraft mc)
     {
         BlockPos pos;
+
+        SchematicPickBlockEventHandler.getInstance().resetCancelled();
 
 		if (SchematicPickBlockEventHandler.getInstance().onSchematicPickBlockStart(closest))
 		{
@@ -1164,7 +1166,7 @@ public class WorldUtils
                     continue;
                 }
                 if (PlacementHandler.WHITELISTED_PROPERTIES.contains(p) &&
-                    !PlacementHandler.BLACKLISTED_PROPERTIES.contains(p))
+                    !PlacementHandler.BLACKLISTED_PROPERTIES.containsKey(p))
                 {
                     @SuppressWarnings("unchecked")
                     Property<T> prop = (Property<T>) p;
