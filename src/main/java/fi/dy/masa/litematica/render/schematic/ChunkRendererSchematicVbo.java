@@ -9,6 +9,7 @@ import com.google.common.collect.Sets;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.systems.VertexSorter;
+import fi.dy.masa.litematica.util.IgnoreBlockRegistry;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockRenderType;
 import net.minecraft.block.BlockState;
@@ -25,11 +26,14 @@ import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.client.world.ClientWorld;
 import net.minecraft.entity.Entity;
 import net.minecraft.fluid.FluidState;
+import net.minecraft.registry.tag.BlockTags;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.math.Vec3i;
+import net.minecraft.util.math.random.Random;
 import net.minecraft.util.profiler.Profiler;
+import net.minecraft.util.shape.VoxelShape;
 import net.minecraft.world.chunk.WorldChunk;
 
 import fi.dy.masa.malilib.util.Color4f;
@@ -54,6 +58,7 @@ public class ChunkRendererSchematicVbo implements AutoCloseable
     protected volatile WorldSchematic world;
     protected final WorldRendererSchematic worldRenderer;
     // UNTHREADED CODE
+    private final Random rand;
     protected final ReentrantLock chunkRenderLock;
     protected final ReentrantLock chunkRenderDataLock;
     protected final Set<BlockEntity> setBlockEntities = new HashSet<>();
@@ -70,8 +75,9 @@ public class ChunkRendererSchematicVbo implements AutoCloseable
 
     private net.minecraft.util.math.Box boundingBox;
     protected Color4f overlayColor;
-    protected boolean hasOverlay = false;
+    protected boolean hasOverlay;
     private boolean ignoreClientWorldFluids;
+    private IgnoreBlockRegistry ignoreBlockRegistry;
 
     protected ChunkCacheSchematic schematicWorldView;
     protected ChunkCacheSchematic clientWorldView;
@@ -92,6 +98,7 @@ public class ChunkRendererSchematicVbo implements AutoCloseable
     {
         this.world = world;
         this.worldRenderer = worldRenderer;
+		this.rand = Random.create();
         this.chunkRenderData = ChunkRenderDataSchematic.EMPTY;
         this.chunkRenderLock = new ReentrantLock();
         this.chunkRenderDataLock = new ReentrantLock();
@@ -100,6 +107,7 @@ public class ChunkRendererSchematicVbo implements AutoCloseable
         this.position = new BlockPos.Mutable();
         this.chunkRelativePos = new BlockPos.Mutable();
         this.builderCache = new BufferBuilderCache();
+		this.hasOverlay = false;
     }
 
     public boolean hasOverlay()
@@ -251,26 +259,26 @@ public class ChunkRendererSchematicVbo implements AutoCloseable
         //if (GuiBase.isCtrlDown()) System.out.printf("resortTransparency\n");
         //if (Configs.Visuals.ENABLE_SCHEMATIC_OVERLAY.getBooleanValue())
 
-        if (Configs.Visuals.SCHEMATIC_OVERLAY_ENABLE_RESORTING.getBooleanValue())
-        {
-            this.getProfiler().swap("resort_overlay");
-            OverlayRenderType type = OverlayRenderType.QUAD;
-
-            if (data.isOverlayTypeEmpty(type) == false)
-            {
-                if (data.getBuiltBufferCache().hasBuiltBufferByType(type))
-                {
-                    try
-                    {
-                        this.resortRenderOverlay(type, x, y, z, data, allocators);
-                    }
-                    catch (Exception e)
-                    {
-                        Litematica.LOGGER.error("resortTransparency() [VBO] caught exception for overlay type [{}] // {}", type.getDrawMode().name(), e.toString());
-                    }
-                }
-            }
-        }
+//        if (Configs.Visuals.SCHEMATIC_OVERLAY_ENABLE_RESORTING.getBooleanValue())
+//        {
+//            this.getProfiler().swap("resort_overlay");
+//            OverlayRenderType type = OverlayRenderType.QUAD;
+//
+//            if (data.isOverlayTypeEmpty(type) == false)
+//            {
+//                if (data.getBuiltBufferCache().hasBuiltBufferByType(type))
+//                {
+//                    try
+//                    {
+//                        this.resortRenderOverlay(type, x, y, z, data, allocators);
+//                    }
+//                    catch (Exception e)
+//                    {
+//                        Litematica.LOGGER.error("resortTransparency() [VBO] caught exception for overlay type [{}] // {}", type.getDrawMode().name(), e.toString());
+//                    }
+//                }
+//            }
+//        }
 
         this.getProfiler().pop();
         this.profiler = null;
@@ -407,6 +415,7 @@ public class ChunkRendererSchematicVbo implements AutoCloseable
             }
         }
 
+        this.getProfiler().swap("rebuild_chunk_lock");
         this.chunkRenderLock.lock();
 
         try
@@ -528,8 +537,7 @@ public class ChunkRendererSchematicVbo implements AutoCloseable
 
             if (this.overlayColor != null)
             {
-                if (stateSchematic.getFluidState().isEmpty() == false &&
-                    Configs.Visuals.ENABLE_SCHEMATIC_FLUIDS.getBooleanValue() == false)
+                if (this.shouldCullOverlayPos(pos, stateSchematic, stateClient))
                 {
                     this.getProfiler().pop();
                     return;
@@ -542,15 +550,54 @@ public class ChunkRendererSchematicVbo implements AutoCloseable
         this.getProfiler().pop();
     }
 
+    private boolean shouldCullOverlayPos(BlockPos posIn, BlockState stateSchematic, BlockState stateClient)
+    {
+        if (stateSchematic.getFluidState().isEmpty() == false &&
+            Configs.Visuals.ENABLE_SCHEMATIC_FLUIDS.getBooleanValue() == false)
+        {
+            return true;
+        }
+
+        if (Configs.Visuals.RENDER_BLOCKS_AS_TRANSLUCENT.getBooleanValue() &&
+            Configs.Visuals.RENDER_TRANSLUCENT_INNER_SIDES.getBooleanValue())
+        {
+            return false;
+        }
+
+        // This helps cull the Overlay Rendering more thuroughly
+        if (Configs.Visuals.ENABLE_SCHEMATIC_OVERLAY_CULLING.getBooleanValue() && stateClient.isIn(BlockTags.AIR))
+        {
+            // If Client World is AIR, then only check the Schematic
+            int count = 0;
+
+            for (Direction side : fi.dy.masa.malilib.util.PositionUtils.ALL_DIRECTIONS)
+            {
+                if (DataManager.getRenderLayerRange().isPositionAtRenderEdgeOnSide(posIn, side) ||
+//                    Block.shouldDrawSide(stateSchematic, this.schematicWorldView, posIn, side, posIn.offset(side)))
+                    Block.shouldDrawSide(stateSchematic, this.schematicWorldView.getBlockState(posIn.offset(side)), side))
+                {
+                    count++;
+                }
+            }
+
+            if (count == 0)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     protected void renderOverlay(OverlayType type, BlockPos pos, BlockState stateSchematic, boolean missing, @Nonnull ChunkRenderDataSchematic data, @Nonnull BufferAllocatorCache allocators)
     {
         this.getProfiler().push("render_overlay");
         boolean useDefault = false;
-
-        RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
-        //RenderSystem.setShader(GameRenderer::getPositionColorProgram);
         BlockPos.Mutable relPos = this.getChunkRelativePosition(pos);
         OverlayRenderType overlayType;
+
+//        RenderSystem.setShader(ShaderProgramKeys.POSITION_COLOR);
+        //RenderSystem.setShader(GameRenderer::getPositionColorProgram);
 
         if (Configs.Visuals.SCHEMATIC_OVERLAY_ENABLE_SIDES.getBooleanValue())
         {
@@ -574,8 +621,9 @@ public class ChunkRendererSchematicVbo implements AutoCloseable
                     Direction side = fi.dy.masa.malilib.util.PositionUtils.ALL_DIRECTIONS[i];
                     posMutable.set(pos.getX() + side.getOffsetX(), pos.getY() + side.getOffsetY(), pos.getZ() + side.getOffsetZ());
                     BlockState adjStateSchematic = this.schematicWorldView.getBlockState(posMutable);
-                    BlockState adjStateClient    = this.clientWorldView.getBlockState(posMutable);
+                    BlockState adjStateClient = this.clientWorldView.getBlockState(posMutable);
                     OverlayType typeAdj = getOverlayType(adjStateSchematic, adjStateClient);
+//                        boolean fullSquareSide = Block.isFaceFullSquare(shape, side);
 
                     // Only render the model-based outlines or sides for missing blocks
                     if (missing && Configs.Visuals.SCHEMATIC_OVERLAY_MODEL_SIDES.getBooleanValue())
@@ -583,24 +631,19 @@ public class ChunkRendererSchematicVbo implements AutoCloseable
                         this.getProfiler().swap("cull_render_model_sides");
                         BakedModel bakedModel = this.worldRenderer.getModelForState(stateSchematic);
 
-                        if (this.worldRenderer.hasQuadsForModel(bakedModel, stateSchematic, side))
+                        if (type.getRenderPriority() > typeAdj.getRenderPriority() ||
+                            !Block.isFaceFullSquare(stateSchematic.getCollisionShape(this.schematicWorldView, pos), side))
                         {
-                            if (type.getRenderPriority() > typeAdj.getRenderPriority() ||
-                                    !Block.isFaceFullSquare(stateSchematic.getCollisionShape(this.schematicWorldView, pos), side))
-                            {
-                                this.getProfiler().swap("cull_render_model");
-                                RenderUtils.drawBlockModelQuadOverlayBatched(bakedModel, stateSchematic, relPos, side, this.overlayColor, 0, bufferOverlayQuads);
-                            }
+                            this.getProfiler().swap("cull_render_model");
+                            RenderUtils.drawBlockModelQuadOverlayBatched(bakedModel, stateSchematic, relPos, side, this.overlayColor, 0, bufferOverlayQuads, this.rand);
                         }
-                        else { useDefault = true; }
                     }
-                    else { useDefault = true; }
-
-                    if (useDefault && type.getRenderPriority() > typeAdj.getRenderPriority())
+                    else if (type.getRenderPriority() > typeAdj.getRenderPriority())
                     {
                         this.getProfiler().swap("cull_render_default");
                         RenderUtils.drawBlockBoxSideBatchedQuads(relPos, side, this.overlayColor, 0, bufferOverlayQuads);
                     }
+                    else { useDefault = true; }
                 }
             }
             else
@@ -610,20 +653,21 @@ public class ChunkRendererSchematicVbo implements AutoCloseable
                 {
                     this.getProfiler().swap("render_model_sides");
                     BakedModel bakedModel = this.worldRenderer.getModelForState(stateSchematic);
-                    if (this.worldRenderer.hasQuadsForModel(bakedModel, stateSchematic, null))
+
+                    if (RenderUtils.modelHasQuads(bakedModel, stateSchematic, this.rand))
                     {
-                        this.getProfiler().swap("render_model");
-                        RenderUtils.drawBlockModelQuadOverlayBatched(bakedModel, stateSchematic, relPos, this.overlayColor, 0, bufferOverlayQuads);
+                        this.getProfiler().swap("render_batched");
+                        RenderUtils.drawBlockModelQuadOverlayBatched(bakedModel, stateSchematic, relPos, this.overlayColor, 0, bufferOverlayQuads, this.rand);
                     }
                     else { useDefault = true; }
                 }
                 else { useDefault = true; }
+            }
 
-                if (useDefault)
-                {
-                    this.getProfiler().swap("render_batched");
-                    fi.dy.masa.malilib.render.RenderUtils.drawBlockBoundingBoxSidesBatchedQuads(relPos, this.overlayColor, 0, bufferOverlayQuads);
-                }
+            if (useDefault)
+            {
+                this.getProfiler().swap("render_batched_default");
+                fi.dy.masa.malilib.render.RenderUtils.drawBlockBoundingBoxSidesBatchedQuads(relPos, this.overlayColor, 0, bufferOverlayQuads);
             }
 
             this.getProfiler().pop();
@@ -693,35 +737,29 @@ public class ChunkRendererSchematicVbo implements AutoCloseable
                     }
                     else
                     {
-                        this.getProfiler().swap("model");
+                        BakedModel bakedModel = this.worldRenderer.getModelForState(stateSchematic);
+
+//                        this.getProfiler().swap("model");
                         /*
                         if (type.getRenderPriority() > typeAdj.getRenderPriority())
                         {
                          */
-                            BakedModel bakedModel = this.worldRenderer.getModelForState(stateSchematic);
 
-                            if (this.worldRenderer.hasQuadsForModel(bakedModel, stateSchematic, null))
-                            {
-                                this.getProfiler().swap("render_model_batched");
-                                //RenderUtils.renderModelQuadOutlines(bakedModel, stateSchematic, relPos, side, overlayColor, 0, bufferOverlayOutlines);
-                                RenderUtils.drawBlockModelOutlinesBatched(bakedModel, stateSchematic, relPos, overlayColor, 0, bufferOverlayOutlines);
-                            }
-                            else { useDefault = true; }
-                        /*
+                        if (RenderUtils.modelHasQuads(bakedModel, stateSchematic, this.rand))
+                        {
+                            this.getProfiler().swap("render_model_batched");
+                            //RenderUtils.renderModelQuadOutlines(bakedModel, stateSchematic, relPos, side, overlayColor, 0, bufferOverlayOutlines);
+                            RenderUtils.drawBlockModelOutlinesBatched(bakedModel, stateSchematic, relPos, overlayColor, 0, bufferOverlayOutlines, this.rand);
                         }
                         else { useDefault = true; }
-                         */
                     }
                 }
-                else { useDefault = true; }
-
-                if (useDefault)
+                else
                 {
                     this.getProfiler().swap("render_reduced_edges");
                     this.renderOverlayReducedEdges(pos, adjTypes, type, bufferOverlayOutlines);
                     //RenderUtils.drawBlockBoundingBoxOutlinesBatchedLines(pos, relPos, overlayColor, 0, bufferOverlayOutlines);
                 }
-            //}
             }
             else
             {
@@ -729,12 +767,12 @@ public class ChunkRendererSchematicVbo implements AutoCloseable
                 // Only render the model-based outlines or sides for missing blocks
                 if (missing && Configs.Visuals.SCHEMATIC_OVERLAY_MODEL_OUTLINE.getBooleanValue())
                 {
+                    this.getProfiler().swap("render_model_batched");
                     BakedModel bakedModel = this.worldRenderer.getModelForState(stateSchematic);
 
-                    if (this.worldRenderer.hasQuadsForModel(bakedModel, stateSchematic, null))
+                    if (RenderUtils.modelHasQuads(bakedModel, stateSchematic, this.rand))
                     {
-                        this.getProfiler().swap("render_model_batched");
-                        RenderUtils.drawBlockModelOutlinesBatched(bakedModel, stateSchematic, relPos, overlayColor, 0, bufferOverlayOutlines);
+                        RenderUtils.drawBlockModelOutlinesBatched(bakedModel, stateSchematic, relPos, overlayColor, 0, bufferOverlayOutlines, this.rand);
                     }
                     else { useDefault = true; }
                 }
@@ -746,7 +784,8 @@ public class ChunkRendererSchematicVbo implements AutoCloseable
                 try
                 {
                     this.getProfiler().swap("render_batched_box");
-                    fi.dy.masa.malilib.render.RenderUtils.drawBlockBoundingBoxOutlinesBatchedLines(relPos, overlayColor, 0, bufferOverlayOutlines);
+//                    fi.dy.masa.malilib.render.RenderUtils.drawBlockBoundingBoxOutlinesBatchedLines(relPos, overlayColor, 0, bufferOverlayOutlines);
+                    RenderUtils.drawBlockBoundingBoxOutlinesBatchedDebugLines(relPos, overlayColor, 0, bufferOverlayOutlines);
                 }
                 catch (Exception ignored) { }
             }
@@ -868,7 +907,22 @@ public class ChunkRendererSchematicVbo implements AutoCloseable
             // TODO --> Maybe someday Mojang will add something to replace isLiquid(), and isSolid()
             if (schematicHasAir)
             {
-                return (clientHasAir || (this.ignoreClientWorldFluids && stateClient.isLiquid())) ? OverlayType.NONE : OverlayType.EXTRA;
+                if (clientHasAir)
+                {
+                    return OverlayType.NONE;
+                }
+                else if (this.ignoreClientWorldFluids && stateClient.isLiquid())
+                {
+                    return OverlayType.NONE;
+                }
+                else if (this.ignoreBlockRegistry.hasBlock(stateClient.getBlock()))
+                {
+                    return OverlayType.NONE;
+                }
+                else
+                {
+                    return OverlayType.EXTRA;
+                }
             }
             else
             {
@@ -1076,17 +1130,17 @@ public class ChunkRendererSchematicVbo implements AutoCloseable
                 return;
             }
 
-            if (type.isTranslucent() && Configs.Visuals.SCHEMATIC_OVERLAY_ENABLE_RESORTING.getBooleanValue())
-            {
-                try
-                {
-                    this.resortRenderOverlay(type, x, y, z, chunkRenderData, allocators);
-                }
-                catch (Exception e)
-                {
-                    throw new RuntimeException(e.toString());
-                }
-            }
+//            if (type.isTranslucent() && Configs.Visuals.SCHEMATIC_OVERLAY_ENABLE_RESORTING.getBooleanValue())
+//            {
+//                try
+//                {
+//                    this.resortRenderOverlay(type, x, y, z, chunkRenderData, allocators);
+//                }
+//                catch (Exception e)
+//                {
+//                    throw new RuntimeException(e.toString());
+//                }
+//            }
         }
     }
 
@@ -1209,32 +1263,32 @@ public class ChunkRendererSchematicVbo implements AutoCloseable
                 return;
             }
 
-            if (type.isTranslucent() && Configs.Visuals.SCHEMATIC_OVERLAY_ENABLE_RESORTING.getBooleanValue())
-            {
-                BuiltBuffer.SortState sortingData;
-                VertexSorter sorter = VertexSorter.byDistance(x, y, z);
-
-                if (chunkRenderData.hasTransparentSortingDataForOverlay(type) == false)
-                {
-                    sortingData = built.sortQuads(allocator, sorter);
-
-                    if (sortingData == null)
-                    {
-                        throw new InterruptedException("Sort State failure");
-                    }
-
-                    chunkRenderData.setTransparentSortingDataForOverlay(type, sortingData);
-                }
-                else
-                {
-                    sortingData = chunkRenderData.getTransparentSortingDataForOverlay(type);
-                }
-
-                if (sortingData == null)
-                {
-                    throw new InterruptedException("Sorting Data failure");
-                }
-            }
+//            if (type.isTranslucent() && Configs.Visuals.SCHEMATIC_OVERLAY_ENABLE_RESORTING.getBooleanValue())
+//            {
+//                BuiltBuffer.SortState sortingData;
+//                VertexSorter sorter = VertexSorter.byDistance(x, y, z);
+//
+//                if (chunkRenderData.hasTransparentSortingDataForOverlay(type) == false)
+//                {
+//                    sortingData = built.sortQuads(allocator, sorter);
+//
+//                    if (sortingData == null)
+//                    {
+//                        throw new InterruptedException("Sort State failure");
+//                    }
+//
+//                    chunkRenderData.setTransparentSortingDataForOverlay(type, sortingData);
+//                }
+//                else
+//                {
+//                    sortingData = chunkRenderData.getTransparentSortingDataForOverlay(type);
+//                }
+//
+//                if (sortingData == null)
+//                {
+//                    throw new InterruptedException("Sorting Data failure");
+//                }
+//            }
         }
     }
 
@@ -1396,6 +1450,7 @@ public class ChunkRendererSchematicVbo implements AutoCloseable
         synchronized (this.boxes)
         {
             this.ignoreClientWorldFluids = Configs.Visuals.IGNORE_EXISTING_FLUIDS.getBooleanValue();
+            this.ignoreBlockRegistry = new IgnoreBlockRegistry();
             ClientWorld worldClient = MinecraftClient.getInstance().world;
             assert worldClient != null;
             this.schematicWorldView = new ChunkCacheSchematic(this.world, worldClient, this.position, 2);
