@@ -5,10 +5,10 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import com.mojang.blaze3d.vertex.ByteBufferBuilder;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+//import net.fabricmc.api.EnvType;
+//import net.fabricmc.api.Environment;
 
-@Environment(EnvType.CLIENT)
+//@Environment(EnvType.CLIENT)
 public class ByteBufferBuilderCache implements AutoCloseable
 {
     protected static final List<ChunkSectionLayer> BLOCK_LAYERS = ChunkRenderLayers.BLOCK_RENDER_LAYERS;
