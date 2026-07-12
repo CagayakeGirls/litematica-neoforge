@@ -1,15 +1,13 @@
 package fi.dy.masa.litematica.compat.modmenu;
 
-import com.terraformersmc.modmenu.api.ConfigScreenFactory;
-import com.terraformersmc.modmenu.api.ModMenuApi;
 import fi.dy.masa.litematica.gui.GuiConfigs;
+import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 
-public class ModMenuImpl implements ModMenuApi
+public class ModMenuImpl
 {
-    @Override
-    public ConfigScreenFactory<?> getModConfigScreenFactory()
+    public IConfigScreenFactory getModConfigScreenFactory()
     {
-        return (screen) -> {
+        return (modContainer, screen) -> {
             GuiConfigs gui = new GuiConfigs();
             gui.setParent(screen);
             return gui;
