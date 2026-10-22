@@ -2,6 +2,7 @@ package fi.dy.masa.litematica.render.schematic;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import org.joml.Matrix4f;
@@ -204,19 +205,61 @@ public class BlockModelCacheSchematic
 		synchronized (this.blockStateModelCache)
 		{
 			this.blockStateModelCache.clear();
-			this.blockStateModelCache.putAll(((IMixinBlockStateModelSet) this.blockStateModelSet).litematica_getModelMap());
+			copyUsableEntries(this.blockStateModelCache, ((IMixinBlockStateModelSet) this.blockStateModelSet).litematica_getModelMap());
 		}
 
 		synchronized (this.blockModelCache)
 		{
 			this.blockModelCache.clear();
-			this.blockModelCache.putAll(((IMixinBlockModelSet) this.blockModelSet).litematica_getBlockModelCache());
+			copyUsableEntries(this.blockModelCache, ((IMixinBlockModelSet) this.blockModelSet).litematica_getBlockModelCache());
 		}
 
 		synchronized (this.fluidModelCache)
 		{
 			this.fluidModelCache.clear();
 			this.fluidModelCache.putAll(((IMixinFluidStateModelSet) this.fluidStateModelSet).litematica_getModelByFluid());
+		}
+	}
+
+	/**
+	 * ModernFix's dynamic resources make these maps lazy: a value can be null or throw when resolved,
+	 * which made putAll() disconnect the player on world join. Skipped states are fetched on demand.
+	 */
+	private static <K, V> void copyUsableEntries(ConcurrentHashMap<K, V> cache, Map<K, V> source)
+	{
+		int skipped = 0;
+		boolean failureLogged = false;
+
+		for (Map.Entry<K, V> entry : source.entrySet())
+		{
+			try
+			{
+				V value = entry.getValue();
+
+				if (entry.getKey() != null && value != null)
+				{
+					cache.put(entry.getKey(), value);
+				}
+				else
+				{
+					skipped++;
+				}
+			}
+			catch (RuntimeException e)
+			{
+				skipped++;
+
+				if (!failureLogged)
+				{
+					failureLogged = true;
+					Litematica.LOGGER.warn("BlockModelCacheSchematic: failed to resolve the model for [{}]", entry.getKey(), e);
+				}
+			}
+		}
+
+		if (skipped > 0)
+		{
+			Litematica.LOGGER.warn("BlockModelCacheSchematic: skipped {} model cache entries without a usable model", skipped);
 		}
 	}
 
