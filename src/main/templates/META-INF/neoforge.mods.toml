@@ -8,7 +8,7 @@ modId="${mod_id}"
 version="${mod_version}"
 displayName="${mod_name}"
 displayURL="${mod_link}"
-logoFile="icon.png"
+iconFile="icon.png"
 credits="masa"
 authors="TexTrue, CagayakeGirls"
 description='''
@@ -19,7 +19,7 @@ Litematica unofficial NeoForge port. A modern schematic mod for NeoForge.
 modId="litematica"
 version="${mod_version}"
 displayName="Litematica Stub"
-logoFile="assets/litematica/icon.png"
+iconFile="assets/litematica/icon.png"
 credits="masa"
 authors="TexTrue, CagayakeGirls"
 description='''
