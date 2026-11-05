@@ -1,9 +1,10 @@
 package fi.dy.masa.litematica.schematic.conversion;
 
+import java.util.List;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.RegistryAccess;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 import net.minecraft.world.item.DyeColor;
@@ -17,6 +18,8 @@ import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 import net.minecraft.world.level.block.state.properties.RedstoneSide;
 
 import fi.dy.masa.malilib.util.StringUtils;
+import fi.dy.masa.malilib.util.data.Constants;
+import fi.dy.masa.malilib.util.data.tag.CompoundData;
 import fi.dy.masa.litematica.mixin.block.IMixinFenceGateBlock;
 import fi.dy.masa.litematica.mixin.block.IMixinRedstoneWireBlock;
 import fi.dy.masa.litematica.mixin.block.IMixinStairsBlock;
@@ -28,24 +31,24 @@ public class SchematicConversionFixers
     private static final BooleanProperty[] HORIZONTAL_CONNECTING_BLOCK_PROPS = new BooleanProperty[] { null, null, CrossCollisionBlock.NORTH, CrossCollisionBlock.SOUTH, CrossCollisionBlock.WEST, CrossCollisionBlock.EAST };
     private static final BlockState REDSTONE_WIRE_DOT_OLD = Blocks.REDSTONE_WIRE.defaultBlockState();
     private static final BlockState REDSTONE_WIRE_DOT = Blocks.REDSTONE_WIRE.defaultBlockState()
-                          .setValue(RedStoneWireBlock.POWER, 0)
-                          .setValue(RedStoneWireBlock.NORTH, RedstoneSide.NONE)
-                          .setValue(RedStoneWireBlock.EAST, RedstoneSide.NONE)
-                          .setValue(RedStoneWireBlock.SOUTH, RedstoneSide.NONE)
-                          .setValue(RedStoneWireBlock.WEST, RedstoneSide.NONE);
+                          .setValue(RedstoneWireBlock.POWER, 0)
+                          .setValue(RedstoneWireBlock.NORTH, RedstoneSide.NONE)
+                          .setValue(RedstoneWireBlock.EAST, RedstoneSide.NONE)
+                          .setValue(RedstoneWireBlock.SOUTH, RedstoneSide.NONE)
+                          .setValue(RedstoneWireBlock.WEST, RedstoneSide.NONE);
     private static final BlockState REDSTONE_WIRE_CROSS = Blocks.REDSTONE_WIRE.defaultBlockState()
-                          .setValue(RedStoneWireBlock.NORTH, RedstoneSide.SIDE)
-                          .setValue(RedStoneWireBlock.EAST, RedstoneSide.SIDE)
-                          .setValue(RedStoneWireBlock.SOUTH, RedstoneSide.SIDE)
-                          .setValue(RedStoneWireBlock.WEST, RedstoneSide.SIDE);
+                          .setValue(RedstoneWireBlock.NORTH, RedstoneSide.SIDE)
+                          .setValue(RedstoneWireBlock.EAST, RedstoneSide.SIDE)
+                          .setValue(RedstoneWireBlock.SOUTH, RedstoneSide.SIDE)
+                          .setValue(RedstoneWireBlock.WEST, RedstoneSide.SIDE);
 
     public static final IStateFixer FIXER_BANNER = (reader, state, pos) -> {
-        CompoundTag tag = reader.getBlockEntityData(pos);
+        CompoundData tag = reader.getBlockEntityData(pos);
 
-        if (tag != null && tag.contains("Base"))
+        if (tag != null && tag.contains("Base", Constants.NBT.TAG_INT))
         {
             DyeColor colorOrig = ((AbstractBannerBlock) state.getBlock()).getColor();
-            DyeColor colorFromData = DyeColor.byId(15 - tag.getIntOr("Base", 0));
+            DyeColor colorFromData = DyeColor.byId(15 - tag.getIntOrDefault("Base", 0));
 
             if (colorOrig != colorFromData)
             {
@@ -79,12 +82,12 @@ public class SchematicConversionFixers
     };
 
     public static final IStateFixer FIXER_BANNER_WALL = (reader, state, pos) -> {
-        CompoundTag tag = reader.getBlockEntityData(pos);
+        CompoundData tag = reader.getBlockEntityData(pos);
 
-        if (tag != null && tag.contains("Base"))
+        if (tag != null && tag.contains("Base", Constants.NBT.TAG_INT))
         {
             DyeColor colorOrig = ((AbstractBannerBlock) state.getBlock()).getColor();
-            DyeColor colorFromData = DyeColor.byId(15 - tag.getIntOr("Base", 0));
+            DyeColor colorFromData = DyeColor.byId(15 - tag.getIntOrDefault("Base", 0));
 
             if (colorOrig != colorFromData)
             {
@@ -118,11 +121,11 @@ public class SchematicConversionFixers
     };
 
     public static final IStateFixer FIXER_BED = (reader, state, pos) -> {
-        CompoundTag tag = reader.getBlockEntityData(pos);
+        CompoundData tag = reader.getBlockEntityData(pos);
 
-        if (tag != null && tag.contains("color"))
+        if (tag != null && tag.contains("color", Constants.NBT.TAG_INT))
         {
-            int colorId = tag.getIntOr("color", -1);
+            int colorId = tag.getIntOrDefault("color", -1);
             Direction facing = state.getValue(BedBlock.FACING);
             BedPart part = state.getValue(BedBlock.PART);
             Boolean occupied = state.getValue(BedBlock.OCCUPIED);
@@ -241,15 +244,15 @@ public class SchematicConversionFixers
     };
 
     public static final IStateFixer FIXER_FLOWER_POT = (reader, state, pos) -> {
-        CompoundTag tag = reader.getBlockEntityData(pos);
+        CompoundData tag = reader.getBlockEntityData(pos);
 
-        if (tag != null && tag.contains("Item"))
+        if (tag != null && tag.contains("Item", Constants.NBT.TAG_STRING))
         {
-            String itemName = tag.getStringOr("Item", "");
+            String itemName = tag.getStringOrDefault("Item", "");
 
-            if (itemName.length() > 0 && tag.contains("Data"))
+            if (itemName.length() > 0 && tag.contains("Data", Constants.NBT.TAG_INT))
             {
-                int meta = tag.getIntOr("Data", 0);
+                int meta = tag.getIntOrDefault("Data", 0);
 
                 switch (itemName)
                 {
@@ -290,13 +293,13 @@ public class SchematicConversionFixers
     };
 
     public static final IStateFixer FIXER_NOTE_BLOCK = (reader, state, pos) -> {
-        CompoundTag tag = reader.getBlockEntityData(pos);
+        CompoundData tag = reader.getBlockEntityData(pos);
 
         if (tag != null)
         {
             state = state
-                        .setValue(NoteBlock.POWERED, tag.getBooleanOr("powered", false))
-                        .setValue(NoteBlock.NOTE, Mth.clamp(tag.getByteOr("note", (byte) 0), 0, 24))
+                        .setValue(NoteBlock.POWERED, tag.getBooleanOrDefault("powered", false))
+                        .setValue(NoteBlock.NOTE, Mth.clamp(tag.getByteOrDefault("note", (byte) 0), 0, 24))
                         .setValue(NoteBlock.INSTRUMENT, reader.getBlockState(pos.below()).instrument());
         }
 
@@ -323,7 +326,7 @@ public class SchematicConversionFixers
     };
 
     public static final IStateFixer FIXER_REDSTONE_WIRE = (reader, state, pos) -> {
-        RedStoneWireBlock wire = (RedStoneWireBlock) state.getBlock();
+        RedstoneWireBlock wire = (RedstoneWireBlock) state.getBlock();
         BlockState stateAdj = ((IMixinRedstoneWireBlock) wire).litematica_GetPlacementState(reader, state, pos);
 
         if (stateAdj.equals(state) == false)
@@ -332,19 +335,22 @@ public class SchematicConversionFixers
             stateAdj = state;
         }
         // Turn all old dots into crosses, while keeping the power level
-        if (stateAdj.equals(REDSTONE_WIRE_DOT) == false && stateAdj.setValue(RedStoneWireBlock.POWER, 0) == REDSTONE_WIRE_DOT_OLD)
+        if (stateAdj.equals(REDSTONE_WIRE_DOT) == false && stateAdj.setValue(RedstoneWireBlock.POWER, 0) == REDSTONE_WIRE_DOT_OLD)
         {
-            stateAdj = REDSTONE_WIRE_CROSS.setValue(RedStoneWireBlock.POWER, stateAdj.getValue(RedStoneWireBlock.POWER));
+            stateAdj = REDSTONE_WIRE_CROSS.setValue(RedstoneWireBlock.POWER, stateAdj.getValue(RedstoneWireBlock.POWER));
         }
 
         return stateAdj;
     };
 
     public static final IStateFixer FIXER_SIGN = (reader, state, pos) -> {
-        CompoundTag tag = reader.getBlockEntityData(pos);
+        CompoundData tag = reader.getBlockEntityData(pos);
 
         if (tag != null &&
-	        (tag.contains("Text1") || tag.contains("Text2") || tag.contains("Text3") || tag.contains("Text4")))
+	        (tag.contains("Text1", Constants.NBT.TAG_STRING) ||
+             tag.contains("Text2", Constants.NBT.TAG_STRING) ||
+             tag.contains("Text3", Constants.NBT.TAG_STRING) ||
+             tag.contains("Text4", Constants.NBT.TAG_STRING)))
         {
 	        Component text1 = Component.empty();
 	        Component text2 = Component.empty();
@@ -354,20 +360,20 @@ public class SchematicConversionFixers
 	        try
 	        {
 		        RegistryAccess registry = SchematicWorldHandler.INSTANCE.getRegistryManager();
-		        text1 = tag.contains("Text1") ? StringUtils.legacyTextSerializer(tag.getStringOr("Text1", ""), registry) : Component.empty();
-		        text2 = tag.contains("Text2") ? StringUtils.legacyTextSerializer(tag.getStringOr("Text2", ""), registry) : Component.empty();
-		        text3 = tag.contains("Text3") ? StringUtils.legacyTextSerializer(tag.getStringOr("Text3", ""), registry) : Component.empty();
-		        text4 = tag.contains("Text4") ? StringUtils.legacyTextSerializer(tag.getStringOr("Text4", ""), registry) : Component.empty();
+		        text1 = tag.contains("Text1", Constants.NBT.TAG_STRING) ? StringUtils.legacyTextSerializer(tag.getStringOrDefault("Text1", ""), registry) : Component.empty();
+		        text2 = tag.contains("Text2", Constants.NBT.TAG_STRING) ? StringUtils.legacyTextSerializer(tag.getStringOrDefault("Text2", ""), registry) : Component.empty();
+		        text3 = tag.contains("Text3", Constants.NBT.TAG_STRING) ? StringUtils.legacyTextSerializer(tag.getStringOrDefault("Text3", ""), registry) : Component.empty();
+		        text4 = tag.contains("Text4", Constants.NBT.TAG_STRING) ? StringUtils.legacyTextSerializer(tag.getStringOrDefault("Text4", ""), registry) : Component.empty();
 	        }
 	        catch (Exception ignored) { }
 
-			DyeColor color = DyeColor.byName(tag.getStringOr("Color", ""), DyeColor.BLACK);
-			boolean glowing = tag.getBooleanOr("GlowingText", false);
-	        SignText frontText = new SignText(new Component[]{text1, text2, text3, text4},
-	                                          new Component[]{Component.empty(), Component.empty(), Component.empty(), Component.empty()},
+			DyeColor color = DyeColor.byName(tag.getStringOrDefault("Color", ""), DyeColor.BLACK);
+			boolean glowing = tag.getBooleanOrDefault("GlowingText", false);
+	        SignText frontText = new SignText(List.of(text1, text2, text3, text4),
+	                                          List.of(Component.empty(), Component.empty(), Component.empty(), Component.empty()),
 	                                          color, glowing);
 
-	        tag.store("front_text", SignText.DIRECT_CODEC, frontText);
+	        tag.putCodec("front_text", SignText.CODEC, frontText);
 
             tag.remove("Color");
             tag.remove("GlowingText");
@@ -381,11 +387,11 @@ public class SchematicConversionFixers
     };
 
     public static final IStateFixer FIXER_SKULL = (reader, state, pos) -> {
-        CompoundTag tag = reader.getBlockEntityData(pos);
+        CompoundData tag = reader.getBlockEntityData(pos);
 
-        if (tag != null && tag.contains("SkullType"))
+        if (tag != null && tag.contains("SkullType", Constants.NBT.TAG_BYTE))
         {
-            int id = Mth.clamp(tag.getByteOr("SkullType", (byte) 0), 0, 5);
+            int id = Mth.clamp(tag.getByteOrDefault("SkullType", (byte) 0), 0, 5);
 
             // ;_; >_> <_<
             if (id == 2) { id = 3; } else if (id == 3) { id = 2; }
@@ -421,18 +427,18 @@ public class SchematicConversionFixers
                 }
             }
 
-            state = state.setValue(BannerBlock.ROTATION, Mth.clamp(tag.getByteOr("Rot", (byte) 0), 0, 15));
+            state = state.setValue(BannerBlock.ROTATION, Mth.clamp(tag.getByteOrDefault("Rot", (byte) 0), 0, 15));
         }
 
         return state;
     };
 
     public static final IStateFixer FIXER_SKULL_WALL = (reader, state, pos) -> {
-        CompoundTag tag = reader.getBlockEntityData(pos);
+        CompoundData tag = reader.getBlockEntityData(pos);
 
-        if (tag != null && tag.contains("SkullType"))
+        if (tag != null && tag.contains("SkullType", Constants.NBT.TAG_BYTE))
         {
-            int id = Mth.clamp(tag.getByteOr("SkullType", (byte) 0), 0, 5);
+            int id = Mth.clamp(tag.getByteOrDefault("SkullType", (byte) 0), 0, 5);
 
             // ;_; >_> <_<
             if (id == 2) { id = 3; } else if (id == 3) { id = 2; }
@@ -539,7 +545,7 @@ public class SchematicConversionFixers
             }
             else
             {
-                return block == Blocks.REDSTONE_WIRE ? state.getValue(RedStoneWireBlock.POWER) : state.getDirectSignal(reader, pos, side);
+                return block == Blocks.REDSTONE_WIRE ? state.getValue(RedstoneWireBlock.POWER) : state.getDirectSignal(reader, pos, side);
             }
         }
         else

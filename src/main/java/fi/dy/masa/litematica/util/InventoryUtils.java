@@ -531,7 +531,7 @@ public class InventoryUtils
                 }
             }
 
-            inv = EntityDataManager.getInstance().getBlockInventoryWrapped(world, pos, false);
+            inv = EntityDataManager.getInstance().getBlockInventoryWrapped(world, pos, true);
         }
 
         if (data != null && !data.isEmpty())
@@ -546,6 +546,20 @@ public class InventoryUtils
 
 //        Litematica.LOGGER.warn("getTarget(): [SchematicWorld? {}] pos [{}], inv [{}], be [{}], nbt [{}]", world instanceof WorldSchematic ? "YES" : "NO", pos.toShortString(), inv != null, be != null, data != null ? data.getString("id") : new CompoundData());
 
+	    if (be == null)
+	    {
+		    be = world.getBlockEntity(pos);
+
+		    if (inv == null || inv.isEmpty())
+		    {
+			    if (be instanceof Container cc)
+			    {
+				    inv = cc;
+			    }
+		    }
+	    }
+
+		// Continue showing nothing when null
         if (inv == null || data == null)
         {
             return null;
@@ -600,66 +614,67 @@ public class InventoryUtils
 		return Optional.empty();
 	}
 
-    /**
-     * Converts an NbtCompound representation of an ItemStack into a '/give' compatible string.
-     * This is the format used by the ItemStringReader(), including Data Components.
-     *
-     * @param nbt (Nbt Input, must be valid ItemStack.encode() format)
-     * @return (The String Result | NULL if the NBT is invalid)
-     */
-    @Nullable
-    public static String convertItemNbtToString(CompoundTag nbt)
-    {
-        StringBuilder result = new StringBuilder();
+	/**
+	 * Converts an NbtCompound representation of an ItemStack into a '/give' compatible string.
+	 * This is the format used by the ItemStringReader(), including Data Components.
+	 *
+	 * @param nbt (Nbt Input, must be valid ItemStack.encode() format)
+	 * @return (The String Result | NULL if the NBT is invalid)
+	 */
+	@Deprecated(forRemoval = true)
+	@Nullable
+	public static String convertItemNbtToString(CompoundTag nbt)
+	{
+		StringBuilder result = new StringBuilder();
 
-        if (nbt.isEmpty())
-        {
-            return null;
-        }
+		if (nbt.isEmpty())
+		{
+			return null;
+		}
 
-        if (nbt.contains("id"))
-        {
-            result.append(nbt.getStringOr("id", "?"));
-        }
-        else
-        {
-            return null;
-        }
-        if (nbt.contains("components"))
-        {
-            CompoundTag components = nbt.getCompoundOrEmpty("components");
-            int count = 0;
+		if (nbt.contains("id"))
+		{
+			result.append(nbt.getStringOr("id", "?"));
+		}
+		else
+		{
+			return null;
+		}
+		if (nbt.contains("components"))
+		{
+			CompoundTag components = nbt.getCompoundOrEmpty("components");
+			int count = 0;
 
-            result.append("[");
+			result.append("[");
 
-            for (String key : components.keySet())
-            {
-                if (count > 0)
-                {
-                    result.append(", ");
-                }
+			for (String key : components.keySet())
+			{
+				if (count > 0)
+				{
+					result.append(", ");
+				}
 
-                result.append(key);
-                result.append("=");
-                result.append(components.get(key));
-                count++;
-            }
+				result.append(key);
+				result.append("=");
+				result.append(components.get(key));
+				count++;
+			}
 
-            result.append("]");
-        }
-        if (nbt.contains("count"))
-        {
-            int count = nbt.getIntOr("count", 1);
+			result.append("]");
+		}
+		if (nbt.contains("count"))
+		{
+			int count = nbt.getIntOr("count", 1);
 
-            if (count > 1)
-            {
-                result.append(" ");
-                result.append(count);
-            }
-        }
+			if (count > 1)
+			{
+				result.append(" ");
+				result.append(count);
+			}
+		}
 
-        return result.toString();
-    }
+		return result.toString();
+	}
 
     /**
      * Post Re-Write Code

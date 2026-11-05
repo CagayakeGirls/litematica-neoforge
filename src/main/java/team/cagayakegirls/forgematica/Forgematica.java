@@ -2,6 +2,9 @@ package team.cagayakegirls.forgematica;
 
 import fi.dy.masa.litematica.Litematica;
 import fi.dy.masa.litematica.compat.modmenu.ModMenuImpl;
+import fi.dy.masa.litematica.network.ServuxLitematicaHandler;
+import fi.dy.masa.litematica.network.ServuxLitematicaPacket;
+import fi.dy.masa.malilib.network.IPluginClientPlayHandler;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
@@ -15,6 +18,8 @@ public class Forgematica {
     public Forgematica(ModContainer modContainer) {
         if (FMLLoader.getCurrent().getDist().isClient()) {
             modContainer.registerExtensionPoint(IConfigScreenFactory.class, new ModMenuImpl().getModConfigScreenFactory());
+            // mafglib registers queued payloads during RegisterPayloadHandlersEvent, so this must run at construction.
+            ServuxLitematicaHandler.getInstance().registerPlayPayload(ServuxLitematicaPacket.Payload.ID, ServuxLitematicaPacket.Payload.CODEC, IPluginClientPlayHandler.BOTH_CLIENT);
             new Litematica().onInitialize();
         }
     }

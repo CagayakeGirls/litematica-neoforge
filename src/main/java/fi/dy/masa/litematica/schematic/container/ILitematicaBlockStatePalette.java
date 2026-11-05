@@ -2,17 +2,13 @@ package fi.dy.masa.litematica.schematic.container;
 
 import java.util.List;
 import javax.annotation.Nullable;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.world.level.block.state.BlockState;
-import org.jetbrains.annotations.ApiStatus;
 
-import com.mojang.serialization.Codec;
+import net.minecraft.world.level.block.state.BlockState;
+
+import fi.dy.masa.malilib.util.data.tag.ListData;
 
 public interface ILitematicaBlockStatePalette
 {
-    @ApiStatus.Experimental
-    Codec<? extends ILitematicaBlockStatePalette> codec();
-
     void setResizer(ILitematicaBlockStatePaletteResizer resizer);
 
     /**
@@ -29,9 +25,9 @@ public interface ILitematicaBlockStatePalette
 
     int getPaletteSize();
 
-    void readFromNBT(ListTag tagList);
+    void readFromData(ListData tagList);
 
-    ListTag writeToNBT();
+    ListData writeToData();
 
     /**
      * Sets the current mapping of the palette.
