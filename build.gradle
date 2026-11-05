@@ -156,7 +156,7 @@ publisher {
 	setChangelog(file("CHANGELOG.md").getText("UTF-8"))
 	setVersion("${project.version}")
 	setDisplayName("${project.version}")
-	setGameVersions("26.2")
+	setGameVersions("26.3")
 	setLoaders(loom.platform.get().id())
 	setCurseEnvironment("${libs.versions.version.env.get()}")
 	setArtifact(jar)
